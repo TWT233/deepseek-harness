@@ -143,22 +143,26 @@ describe('loadProfile', () => {
     expect(bare.layers).toEqual([])
   })
 
-  it('auto-initializes only shipped templates and fails loud otherwise', () => {
+  it('auto-initializes shipped templates and fails loud otherwise', () => {
     const anchor = stageInstallation({})
     const home = tmp()
     expect(() => loadProfile('t', 'custom', anchor, home))
       .toThrow('profile "custom" does not exist')
-    // The web template auto-initializes on first load. Bundle resolution
-    // cannot be asserted to fail here: the source-plane test runner resolves
-    // @deepseek-ai/* through tsconfig paths regardless of the staged anchor.
-    expect(PROFILE_TEMPLATES.web).toContain('@deepseek-ai/dsh-base')
-    try {
-      loadProfile('t', 'web', anchor, home)
-    } catch {
-      // Resolution failure is the plain-Node outcome for this empty anchor.
+    for (const [name, bundles] of Object.entries({
+      cli: ['@deepseek-ai/dsh-base', '@deepseek-ai/dsh-cli-app'],
+      web: ['@deepseek-ai/dsh-base', '@deepseek-ai/dsh-web-app'],
+      headless: ['@deepseek-ai/dsh-base', '@deepseek-ai/dsh-headless'],
+    })) {
+      expect(PROFILE_TEMPLATES[name]).toEqual(bundles)
+      try {
+        loadProfile('t', name, anchor, home)
+      } catch {
+        // Bundle resolution is outside profile initialization; the empty
+        // staged installation carries none of the shipped packages.
+      }
+      expect(readProfileManifest('t', resolveProfileDir(name, home)).dsh?.profile?.bundles)
+        .toEqual(bundles)
     }
-    expect(readProfileManifest('t', resolveProfileDir('web', home)).dsh?.profile?.bundles)
-      .toEqual([...PROFILE_TEMPLATES.web ?? []])
   })
 
   it('normalizes only the exact installation-owned headless bundle tuple', () => {

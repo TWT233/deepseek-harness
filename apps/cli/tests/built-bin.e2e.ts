@@ -310,13 +310,14 @@ function startStartupProfile(fixture: StartupFixture, args: readonly string[]) {
 }
 
 describe.skipIf(!existsSync(dshBin))('dsh BUILT bin (node lib/bin.js, no tsx)', () => {
-  it('requires --profile and rejects removed commands', async () => {
+  it('routes bare help and rejects removed commands', async () => {
     const bare = await runBuiltBin()
     expect(bare.code).toBe(1)
     expect(bare.stdout).toBe('')
-    expect(bare.stderr).toContain('--profile <name> is required')
+    expect(bare.stderr).toContain('interactive CLI requires TTY stdin and stdout')
     const help = await runBuiltBin(['--help'])
     expect(help.code).toBe(0)
+    expect(help.stdout).toContain('dsh --resume <session>')
     expect(help.stdout).toContain('dsh --profile web')
     expect(help.stdout).toContain('dsh plugin --profile')
     expect(help.stdout).not.toMatch(/^\s+(?:tui|meta|upgrade)\b/mu)
@@ -329,6 +330,15 @@ describe.skipIf(!existsSync(dshBin))('dsh BUILT bin (node lib/bin.js, no tsx)', 
   it('routes help and usage errors without activating startup-dependent rows', async () => {
     const home = mkdtempSync(join(tmpdir(), 'dsh-app-help-'))
     try {
+      const cli = await runBuiltBin(['--profile', 'cli', '--help'], {
+        DSH_HOME: home,
+        DSH_TELEMETRY_DISABLED: '1',
+      })
+      expect(cli.code).toBe(0)
+      expect(cli.stderr).toBe('')
+      expect(cli.stdout).toContain('Usage: dsh --profile cli')
+      expect(cli.stdout).toContain('--resume <session-id>')
+
       const web = await runBuiltBin(['--profile', 'web', '--help'], {
         DSH_HOME: home,
         DSH_TELEMETRY_DISABLED: '1',
@@ -697,6 +707,20 @@ describe.skipIf(!existsSync(dshBin))('dsh BUILT bin (node lib/bin.js, no tsx)', 
     let home: string
     beforeEach(() => { home = mkdtempSync(join(tmpdir(), 'dsh-dump-bin-')) })
     afterEach(() => { rmSync(home, { recursive: true, force: true }) })
+
+    it('prints the bare CLI profile with full access and no Web host', async () => {
+      const { stdout, code, stderr } = await runBuiltBin(
+        ['--dump-default-config'],
+        { DSH_HOME: home },
+      )
+      expect(code).toBe(0)
+      expect(stderr).toBe('')
+      expect(stdout).toContain("name: '@deepseek-ai/dsh-cli-app'")
+      expect(stdout).toContain('mode: danger-full-access')
+      expect(stdout).toContain('policy: never')
+      expect(stdout).not.toMatch(/name: '@deepseek-ai\/dsh-host-/)
+      expect(stdout).not.toContain("name: '@deepseek-ai/dsh-web-app'")
+    }, 30_000)
 
     it('prints the web profile bundle layers without a user layer', async () => {
       const { stdout, code, stderr } = await runBuiltBin(['--profile', 'web', '--dump-default-config'], { DSH_HOME: home })

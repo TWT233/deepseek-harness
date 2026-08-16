@@ -26,6 +26,7 @@
       "types": "./lib/types/invariant.d.ts",
       "default": "./lib/invariant.js"
     },
+    "./cordis.patch.yml": "./cordis.patch.yml",
     "./src/*": "./src/*",
     "./package.json": "./package.json"
   },
@@ -33,9 +34,15 @@
     "lib/index.js",
     "lib/invariant.js",
     "lib/startup.js",
+    "cordis.patch.yml",
     "lib/types/**/*.d.ts"
   ],
   "license": "MIT",
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  },
   "dependencies": {
     "@deepseek-ai/dsh-cmdline": "workspace:^",
     "@deepseek-ai/dsh-output-retention": "workspace:^",
