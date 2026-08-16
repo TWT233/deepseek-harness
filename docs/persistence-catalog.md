@@ -235,6 +235,22 @@ Types: [TokenUsage](subsystems/llm-streaming.md)
 
 Source: [`packages/core/session/src/types.ts:273`](../packages/core/session/src/types.ts)
 
+### `cli/*`
+
+<a id="clisession--log-only"></a>
+
+#### `cli/session` — log-only
+
+```ts persistence-catalog
+/**
+ * Identifies an interactive CLI Session and the policies written
+ * immediately before this required marker.
+ */
+'cli/session': CliSessionMarker
+```
+
+Source: [`packages/bundle/cli-app/src/session.ts:35`](../packages/bundle/cli-app/src/session.ts)
+
 ### `command/*`
 
 <a id="commanddone--log-only"></a>
