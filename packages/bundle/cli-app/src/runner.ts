@@ -113,7 +113,10 @@ function inputHandler(
   requestExit: (code: number) => void,
 ): (input: RollingTerminalInput) => void {
   return (input) => {
-    if (questions.accept(input)) return
+    if (questions.accept(input)) {
+      if (input.kind === 'eof') requestExit(0)
+      return
+    }
     if (input.kind === 'submit') {
       void dispatchCliInput(ctx, agent, terminal, input.text, controller.signal)
         .catch((error: unknown) => {
@@ -138,7 +141,7 @@ function inputHandler(
 
 async function disposeOwned(
   ctx: Context,
-  handle: AgentHandle,
+  handle: AgentHandle | undefined,
   terminal: RollingTerminalPort,
   questions: CliQuestionProvider | undefined,
   commandScope: ReturnType<Context['inject']> | undefined,
@@ -146,23 +149,43 @@ async function disposeOwned(
   controller: AbortController,
 ): Promise<void> {
   controller.abort(new Error('interactive CLI stopped'))
-  questions?.dispose()
-  unregisterQuestions?.()
-  try {
-    await commandScope?.dispose()
-  } finally {
-    handle.agent.cancel({ kind: 'user' })
+  const failures: unknown[] = []
+  const stage = async (operation: () => unknown): Promise<void> => {
     try {
-      await handle.agent.whenIdle()
-      await ctx.sessions.flush(handle.agent.session)
-    } finally {
-      try {
-        await handle.dispose()
-      } finally {
-        await terminal.stop()
-      }
+      await operation()
+    } catch (error: unknown) {
+      failures.push(error)
     }
   }
+  await stage(() => questions?.dispose())
+  await stage(() => unregisterQuestions?.())
+  await stage(() => commandScope?.dispose())
+  await stage(() => handle?.agent.cancel({ kind: 'user' }))
+  await stage(() => handle?.agent.whenIdle())
+  await stage(() => handle === undefined
+    ? undefined
+    : ctx.sessions.flush(handle.agent.session))
+  await stage(() => handle?.dispose())
+  await stage(() => terminal.stop())
+  if (failures.length > 0) {
+    throw new AggregateError(failures, 'interactive CLI teardown failed')
+  }
+}
+
+function waitForShutdown(
+  exit: Promise<number>,
+  signal: AbortSignal | undefined,
+): Promise<void> {
+  if (signal === undefined) return exit.then(() => undefined)
+  if (signal.aborted) return Promise.resolve()
+  return new Promise<void>((resolve) => {
+    const done = (): void => {
+      signal.removeEventListener('abort', done)
+      resolve()
+    }
+    signal.addEventListener('abort', done, { once: true })
+    void exit.then(done)
+  })
 }
 
 /**
@@ -171,12 +194,14 @@ async function disposeOwned(
  * @param config - transcript visibility and output bounds.
  * @param startup - fresh or resumed Session selection.
  * @param terminalFactory - factory called only after resume preflight succeeds.
+ * @param shutdownSignal - plugin-owned request to stop and drain without requesting process exit.
  */
 export async function runCli(
   ctx: Context,
   config: CliTranscriptConfig,
   startup: CliStartupValues,
   terminalFactory: CliTerminalFactory,
+  shutdownSignal?: AbortSignal,
 ): Promise<void> {
   await ctx.get('loader')?.await()
   const appExit = ctx.get('appExit')
@@ -245,24 +270,16 @@ export async function runCli(
       controller,
       requestExit,
     ))
-    await exit.promise
+    await waitForShutdown(exit.promise, shutdownSignal)
   } finally {
-    if (handle !== undefined) {
-      await disposeOwned(
-        ctx,
-        handle,
-        terminal,
-        questions,
-        commandScope,
-        unregisterQuestions,
-        controller,
-      )
-    } else {
-      controller.abort(new Error('interactive CLI startup failed'))
-      questions?.dispose()
-      unregisterQuestions?.()
-      await commandScope?.dispose()
-      await terminal.stop()
-    }
+    await disposeOwned(
+      ctx,
+      handle,
+      terminal,
+      questions,
+      commandScope,
+      unregisterQuestions,
+      controller,
+    )
   }
 }

@@ -76,9 +76,27 @@ export function apply(ctx: Context, config: Config): void {
   if (startup === undefined) {
     throw new Error('cli-runner: cliStartup must be provided before the tree mounts')
   }
-  void runCli(ctx, config, startup, internals.terminalFactory)
-    .catch((error: unknown) => {
-      ctx.logger.error(error)
+  ctx.effect(() => {
+    const shutdown = new AbortController()
+    const outcome = runCli(
+      ctx,
+      config,
+      startup,
+      internals.terminalFactory,
+      shutdown.signal,
+    ).then(
+      () => ({ ok: true }) as const,
+      (error: unknown) => ({ ok: false, error }) as const,
+    )
+    void outcome.then((result) => {
+      if (result.ok || shutdown.signal.aborted) return
+      ctx.logger.error(result.error)
       exit(1)
     })
+    return async () => {
+      shutdown.abort(new Error('cli-runner plugin disposed'))
+      const result = await outcome
+      if (!result.ok) throw result.error
+    }
+  }, 'cli-runner lifecycle')
 }

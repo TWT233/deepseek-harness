@@ -19,6 +19,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   Config,
   apply,
+  inject,
   internals,
   name,
 } from '../src/index.ts'
@@ -26,6 +27,7 @@ import {
   runCli,
   type CliTerminalFactory,
 } from '../src/runner.ts'
+import { CliQuestionProvider } from '../src/questions.ts'
 import type {
   CliStartupValues,
   RollingTerminalInput,
@@ -71,6 +73,7 @@ class FakeTerminal implements RollingTerminalPort {
   starts = 0
   stops = 0
   startError: Error | undefined
+  stopError: Error | undefined
   input: ((input: RollingTerminalInput) => void) | undefined
 
   constructor(calls: string[] = []) {
@@ -94,6 +97,7 @@ class FakeTerminal implements RollingTerminalPort {
   async stop(): Promise<void> {
     this.calls.push('terminal.stop')
     this.stops++
+    if (this.stopError !== undefined) throw this.stopError
   }
   send(input: RollingTerminalInput): void {
     this.input?.(input)
@@ -116,7 +120,12 @@ interface Harness {
     reasoningEffort: ReasoningEffortId
   }
   inspection?: { meta: SessionHeader; events: readonly SessionEvent[] }
+  cancelError?: Error
+  whenIdleError?: Error
+  whenIdleGate?: Promise<void>
   flushError?: Error
+  handleDisposeError?: Error
+  commandDisposeError?: Error
   agent?: Agent
   handle?: AgentHandle
   terminalFactory: CliTerminalFactory
@@ -135,6 +144,7 @@ async function harness(): Promise<Harness> {
   const steer = vi.fn()
   const cancel = vi.fn(() => {
     calls.push('agent.cancel')
+    if (test.cancelError !== undefined) throw test.cancelError
   })
   const defaultSelection = {
     provider: 'default-provider',
@@ -204,6 +214,8 @@ async function harness(): Promise<Harness> {
       cancel,
       whenIdle: vi.fn(async () => {
         calls.push('agent.whenIdle')
+        await test.whenIdleGate
+        if (test.whenIdleError !== undefined) throw test.whenIdleError
       }),
     } as unknown as Agent
     const agentCtx = ctx.extend({ agent })
@@ -213,10 +225,29 @@ async function harness(): Promise<Harness> {
       agent,
       dispose: async () => {
         calls.push('handle.dispose')
+        if (test.handleDisposeError !== undefined) throw test.handleDisposeError
       },
     }
     test.agent = agent
     test.handle = handle
+    if (test.commandDisposeError !== undefined) {
+      const inject = agentCtx.inject.bind(agentCtx)
+      Object.defineProperty(agentCtx, 'inject', {
+        configurable: true,
+        value: (...args: Parameters<Context['inject']>) => {
+          const fiber = inject(...args)
+          const dispose = fiber.dispose.bind(fiber)
+          Object.defineProperty(fiber, 'dispose', {
+            configurable: true,
+            value: async () => {
+              await dispose()
+              throw test.commandDisposeError
+            },
+          })
+          return fiber
+        },
+      })
+    }
     return handle
   }
 
@@ -276,6 +307,24 @@ describe('interactive CLI runner', () => {
       {},
       () => new FakeTerminal(),
     )).rejects.toThrow('must provide ctx.appExit')
+  })
+
+  it('starts and immediately drains for an already-aborted shutdown signal', async () => {
+    const test = await harness()
+    const shutdown = new AbortController()
+    shutdown.abort(new Error('plugin already disposed'))
+
+    await runCli(
+      test.ctx,
+      config,
+      {},
+      test.terminalFactory,
+      shutdown.signal,
+    )
+
+    expect(test.terminal.starts).toBe(1)
+    expect(test.terminal.stops).toBe(1)
+    expect(test.exitCodes).toEqual([])
   })
 
   it('creates a fresh Agent with the deployment model and durable CLI policies', async () => {
@@ -498,6 +547,22 @@ describe('interactive CLI runner', () => {
     await running
   })
 
+  it('cancels an active question and requests exit 0 on EOF', async () => {
+    const test = await harness()
+    const { running } = await started(test)
+    const question = test.ctx.userQuestions.ask({
+      agent: test.agent as Agent,
+      questions: [{ id: 'confirm', question: 'Proceed?' }],
+    })
+
+    test.terminal.send({ kind: 'eof' })
+
+    await expect(question).rejects.toThrow('question cancelled by user')
+    await running
+    expect(test.exitCodes).toEqual([0])
+    expect(test.terminal.stops).toBe(1)
+  })
+
   it('projects only live events from the owned Session', async () => {
     const test = await harness()
     const { running } = await started(test)
@@ -630,13 +695,88 @@ describe('interactive CLI runner', () => {
 
     test.terminal.send({ kind: 'eof' })
 
-    await expect(running).rejects.toThrow('flush failed')
+    await expect(running).rejects.toSatisfy((error: unknown) => (
+      error instanceof AggregateError
+      && error.errors.includes(test.flushError)
+    ))
     expect(test.calls.slice(-4)).toEqual([
       'agent.whenIdle',
       'sessions.flush',
       'handle.dispose',
       'terminal.stop',
     ])
+  })
+
+  it.each([
+    'questions.dispose',
+    'provider unregister',
+    'command disposal',
+    'agent.cancel',
+    'agent.whenIdle',
+    'sessions.flush',
+    'handle.dispose',
+    'terminal.stop',
+  ] as const)('contains %s failure and attempts every later teardown stage', async (stage) => {
+    const test = await harness()
+    const failure = new Error(`${stage} failed`)
+    let restore: (() => void) | undefined
+    if (stage === 'questions.dispose') {
+      const spy = vi.spyOn(CliQuestionProvider.prototype, 'dispose')
+        .mockImplementationOnce(() => {
+          throw failure
+        })
+      restore = () => {
+        spy.mockRestore()
+      }
+    } else if (stage === 'provider unregister') {
+      const register = test.ctx.userQuestions.registerProvider.bind(test.ctx.userQuestions)
+      const spy = vi.spyOn(test.ctx.userQuestions, 'registerProvider')
+        .mockImplementationOnce((provider) => {
+          const unregister = register(provider)
+          return () => {
+            unregister()
+            throw failure
+          }
+        })
+      restore = () => {
+        spy.mockRestore()
+      }
+    } else if (stage === 'command disposal') {
+      test.commandDisposeError = failure
+    } else if (stage === 'agent.cancel') {
+      test.cancelError = failure
+    } else if (stage === 'agent.whenIdle') {
+      test.whenIdleError = failure
+    } else if (stage === 'sessions.flush') {
+      test.flushError = failure
+    } else if (stage === 'handle.dispose') {
+      test.handleDisposeError = failure
+    } else {
+      test.terminal.stopError = failure
+    }
+
+    try {
+      const { running } = await started(test)
+      test.terminal.send({ kind: 'eof' })
+
+      await expect(running).rejects.toSatisfy((error: unknown) => (
+        error instanceof AggregateError
+        && error.errors.includes(failure)
+      ))
+      const ordered = [
+        'agent.cancel',
+        'agent.whenIdle',
+        'sessions.flush',
+        'handle.dispose',
+        'terminal.stop',
+      ]
+      const stageIndex = ordered.indexOf(stage)
+      for (const later of ordered.slice(Math.max(0, stageIndex + 1))) {
+        expect(test.calls).toContain(later)
+      }
+    } finally {
+      restore?.()
+    }
   })
 
   it('stops the terminal when Agent creation fails before ownership completes', async () => {
@@ -754,5 +894,92 @@ describe('interactive CLI plugin', () => {
       expect(exits).toEqual([1])
     })
     expect(errors).toEqual([expect.objectContaining({ message: 'loader failed' })])
+  })
+
+  it('aborts and awaits the runner during plugin unload', async () => {
+    const test = await harness()
+    const errors: unknown[] = []
+    const idle = Promise.withResolvers<undefined>()
+    test.ctx.logger.error = (error: unknown) => {
+      errors.push(error)
+      return test.ctx.logger
+    }
+    test.ctx.provide('cliStartup', {})
+    internals.terminalFactory = test.terminalFactory
+    const plugin = test.ctx.plugin({
+      name: 'cli-runner-test',
+      inject,
+      Config,
+      apply,
+    }, config)
+    await plugin
+    await vi.waitFor(() => {
+      expect(
+        test.terminal.starts,
+        JSON.stringify({
+          calls: test.calls,
+          exitCodes: test.exitCodes,
+          errors: errors.map(error => String(error)),
+        }),
+      ).toBe(1)
+    })
+    test.whenIdleGate = idle.promise
+
+    let disposed = false
+    const disposal = plugin.dispose().then(() => {
+      disposed = true
+    })
+    await vi.waitFor(() => {
+      expect(test.calls).toContain('agent.whenIdle')
+    })
+    expect(disposed).toBe(false)
+    expect(test.exitCodes).toEqual([])
+
+    idle.resolve(undefined)
+    await disposal
+    expect(test.calls.slice(-5)).toEqual([
+      'agent.cancel',
+      'agent.whenIdle',
+      'sessions.flush',
+      'handle.dispose',
+      'terminal.stop',
+    ])
+  })
+
+  it('surfaces runner teardown failure from plugin unload after later releases', async () => {
+    const test = await harness()
+    const failure = new Error('terminal stop failed during unload')
+    const errors: unknown[] = []
+    test.terminal.stopError = failure
+    test.ctx.logger.error = (error: unknown) => {
+      errors.push(error)
+      return test.ctx.logger
+    }
+    test.ctx.provide('cliStartup', {})
+    internals.terminalFactory = test.terminalFactory
+    const plugin = test.ctx.plugin({
+      name: 'cli-runner-test',
+      inject,
+      Config,
+      apply,
+    }, config)
+    await plugin
+    await vi.waitFor(() => {
+      expect(test.terminal.starts).toBe(1)
+    })
+
+    await plugin.dispose()
+    expect(errors.some(error => (
+      error instanceof AggregateError
+      && error.message === 'interactive CLI teardown failed'
+      && error.errors.includes(failure)
+    ))).toBe(true)
+    expect(test.calls.slice(-5)).toEqual([
+      'agent.cancel',
+      'agent.whenIdle',
+      'sessions.flush',
+      'handle.dispose',
+      'terminal.stop',
+    ])
   })
 })
