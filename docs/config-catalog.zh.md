@@ -389,6 +389,26 @@ export type Config = LocalConfig
 
 来源：[`packages/shell/bash-sandbox/src/index.ts:35`](../packages/shell/bash-sandbox/src/index.ts)
 
+<a id="deepseek-aidsh-cli-app"></a>
+
+## `@deepseek-ai/dsh-cli-app`
+
+需要：`agentDefaultModel` · `agents` · `commands` · `sessionPersistence` · `sessions` · `tools` · `userQuestions` · `CLI_STARTUP_SERVICE`
+
+```ts config-catalog
+/** Transcript visibility and output bounds. */
+export interface Config {
+  /** Maximum terminal lines retained for one tool result. */
+  maxToolOutputLines: number
+  /** Maximum UTF-8 bytes retained for one tool result. */
+  maxToolOutputBytes: number
+  /** Whether model reasoning blocks are rendered. */
+  showReasoning: boolean
+}
+```
+
+来源：[`packages/bundle/cli-app/src/index.ts:38`](../packages/bundle/cli-app/src/index.ts)
+
 <a id="deepseek-aidsh-client-connection"></a>
 
 ## `@deepseek-ai/dsh-client-connection`

@@ -17,10 +17,18 @@ DeepSeek Harness 目前处于 _开发者预览_ 阶段，正在快速迭代。**
 安装 `Node.js`，然后运行：
 
 ```sh
+npx @deepseek-ai/dsh
+```
+
+**警告：**终端 CLI（命令行界面）采用 `danger-full-access` 且禁用审批。命令和工具可以修改该进程能够访问的任何路径。详见[终端 CLI 指南](docs/user/guide/cli.md)。
+
+如需使用浏览器界面：
+
+```sh
 npx @deepseek-ai/dsh web
 ```
 
-该命令会启动 Web UI，默认地址为 `http://127.0.0.1:3080`。详见 [Web UI 指南](docs/user/guide/index.md)。
+Web UI 默认地址为 `http://127.0.0.1:3080`。详见 [Web UI 指南](docs/user/guide/index.md)。
 
 ### 从源码运行
 
@@ -31,7 +39,7 @@ git clone https://github.com/deepseek-ai/deepseek-harness.git
 cd deepseek-harness
 pnpm install
 pnpm run build
-pnpm dsh web
+pnpm dsh
 ```
 
 ## 社区与支持

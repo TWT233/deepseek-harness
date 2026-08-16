@@ -11,4 +11,4 @@ Profile 组合包：在 manifest（元数据清单）中声明 `"dsh": { "bundle
 | [`web-app/`](web-app/README.md) | 浏览器表层：web patch 层 + 运行时粘合插件 | 挂载多条配置行 |
 | [`headless/`](headless/README.md) | 直接运行在 base 之上的一次性任务模式，不含 Host 或 Web 层 | 挂载 `headless-runner` |
 
-内置组合包从 dsh 安装目录解析；树外（out-of-tree）组合包通过 `dsh plugin --profile <name> add <package>` 安装进 profile。
+裸 `dsh` 组合 `base` 与 `cli-app`；`web` 和 `headless` 模板组合 `base` 与各自对应的应用组合包。内置组合包从 dsh 安装目录解析；树外（out-of-tree）组合包通过 `dsh plugin --profile <name> add <package>` 安装进 profile。

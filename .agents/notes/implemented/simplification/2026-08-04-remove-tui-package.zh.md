@@ -34,6 +34,6 @@ Status: implemented
 
 ## 后果
 
-DeepSeek Harness 不再提供终端 UI 包。现有 import 和依赖该包的 `cordis.yml` 条目会直接失败，不会得到兼容转换。Web 仍是已交付的交互界面；ACP、JSON-RPC 与一次性 CLI 仍是 Web 之外的入口。
+`@deepseek-ai/dsh-tui` 保持已移除状态。现有 import 和依赖该包的 `cordis.yml` 条目会直接失败，不会得到兼容转换。独立的 [`@deepseek-ai/dsh-cli-app`](../feature/2026-08-16-rolling-terminal-cli.md) 包提供已交付的滚动终端应用，而不会恢复全屏 TUI 包或其兼容表层。
 
-提供方无关的命令、用户交互、审批、工具呈现、PTY 与会话投影能力仍可供其他宿主使用。重新引入终端前端时，必须为其提供具名产品或部署、显式包边界、具体交互提供方，以及组装后的生命周期与 transcript（文本记录）验收；[滚动式终端 CLI proposal](../../proposed/feature/2026-08-16-rolling-terminal-cli.md)按这些条件接受评估，同时不恢复本包。
+提供方无关的命令、用户交互、审批、工具呈现、PTY 与会话投影能力仍可供其他宿主使用。任何其他终端前端仍必须具备具名产品或部署、显式包边界、具体交互提供方，以及组装后的生命周期与 transcript（文本记录）验证。

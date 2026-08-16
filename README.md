@@ -17,10 +17,18 @@ DeepSeek Harness is currently in _developer preview_ and is iterating rapidly. *
 Install `Node.js`, then run:
 
 ```sh
+npx @deepseek-ai/dsh
+```
+
+**Warning:** the terminal CLI runs with `danger-full-access` and approval disabled. Commands and tools can modify any path available to the process. See the [terminal CLI guide](docs/user/guide/cli.md).
+
+For the browser interface instead:
+
+```sh
 npx @deepseek-ai/dsh web
 ```
 
-The command starts the Web UI, served at `http://127.0.0.1:3080` by default. See [Web UI guide](docs/user/guide/index.md).
+The Web UI is served at `http://127.0.0.1:3080` by default. See the [Web UI guide](docs/user/guide/index.md).
 
 ### Run from source
 
@@ -31,7 +39,7 @@ git clone https://github.com/deepseek-ai/deepseek-harness.git
 cd deepseek-harness
 pnpm install
 pnpm run build
-pnpm dsh web
+pnpm dsh
 ```
 
 ## Community and support

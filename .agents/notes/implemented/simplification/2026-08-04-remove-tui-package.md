@@ -34,6 +34,6 @@ Repository searches and generated catalogs contain no TUI package, dependency pa
 
 ## Consequences
 
-DeepSeek Harness has no terminal UI package. Existing imports and `cordis.yml` rows that depend on the package fail instead of being translated. Web remains the shipped interactive surface; ACP, JSON-RPC, and one-shot CLI remain the non-Web entry points.
+`@deepseek-ai/dsh-tui` remains removed. Existing imports and `cordis.yml` rows that depend on that package fail instead of being translated. The distinct [`@deepseek-ai/dsh-cli-app`](../feature/2026-08-16-rolling-terminal-cli.md) package provides the shipped rolling terminal application without restoring the full-screen TUI package or its compatibility surface.
 
-The provider-neutral command, user-questions, approval, tool-presentation, PTY, and session-projection capabilities remain available to other hosts. Reintroducing a terminal frontend requires a named product or deployment, an explicit package boundary, a concrete interaction provider, and assembled lifecycle and transcript acceptance for that frontend; the [rolling terminal CLI proposal](../../proposed/feature/2026-08-16-rolling-terminal-cli.md) is evaluated against those conditions without restoring this package.
+The provider-neutral command, user-questions, approval, tool-presentation, PTY, and session-projection capabilities remain available to other hosts. Any additional terminal frontend still requires a named product or deployment, an explicit package boundary, a concrete interaction provider, and assembled lifecycle and transcript verification.

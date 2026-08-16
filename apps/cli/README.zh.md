@@ -2,18 +2,23 @@
 
 [English](README.md) | 中文
 
-`dsh` 是 DeepSeek Harness 中用于启动 profile 的命令；profile 由多个插件组合包 patch 层按顺序叠加而成，其上再应用用户自己的覆盖配置。[`src/args.ts`](src/args.ts) 负责命令语法，[`src/bin.ts`](src/bin.ts) 只加载选中的运行器。无效命令、来自其他模式的选项、配置错误和启动失败都会以非零状态退出。
+`dsh` 用于启动 profile；profile 由多个插件组合包 patch 层按顺序叠加而成，其上再应用用户自己的覆盖配置。[`src/args.ts`](src/args.ts) 负责命令语法，[`src/bin.ts`](src/bin.ts) 只加载选中的运行器。无效命令、来自其他模式的选项、配置错误和启动失败都会以非零状态退出。
 
 ## 入口模式
 
 | 命令 | 用途 |
 |---|---|
+| `dsh` | 通过 `cli` profile 启动一个新的交互式滚动终端 Session（会话）。 |
+| `dsh --resume <session-id>` | 从记录的 workspace（工作区）恢复交互式 CLI Session。 |
 | `dsh --profile <name>` | 启动位于 `$DSH_HOME/profiles/<name>` 的指定 profile。 |
 | `dsh --profile headless "job"` | 运行一个全新的持久化会话，打印最终答案并退出。 |
 | `dsh web` | `--profile web` 的别名。 |
 | `dsh plugin --profile <name> <pnpm args>` | 通过在 profile 目录中转发给 pnpm 来管理该 profile 的插件。 |
+| `dsh --dump-default-config` / `dsh --dump-config` | 在不启动的情况下打印默认 CLI profile 层或其完整组合配置树。 |
 
-运行命令时所在的目录将作为默认 workspace 根目录。`web` 和 `headless` profile 在首次使用时会从随附模板自动初始化；其他任何 profile 都必须通过 `dsh plugin` 创建。
+运行命令时所在的目录将作为默认 workspace 根目录。`cli`、`web` 和 `headless` profile 在首次使用时会从随附模板自动初始化；其他任何 profile 都必须通过 `dsh plugin` 创建。
+
+随附的 CLI profile 采用 `danger-full-access` 和 `never` 审批策略。它会显示警告，因为命令和工具可以修改该进程能够访问的任何路径，并且该 profile 不挂载审批 UI。模型请求的用户问题仍可交互回答。使用该 profile 前请阅读[终端 CLI 指南](../../docs/user/guide/cli.md)。
 
 ## 应用参数
 
@@ -21,10 +26,11 @@
 
 ```sh
 dsh --profile web --port 8080       # --port belongs to the web app
-dsh --profile tui --resume <id>     # example, assuming the tui profile is installed; --resume belongs to the terminal app
+dsh --patch ./local.yml --resume <id> # --patch is launcher-owned; --resume belongs to the CLI app
 dsh --profile headless "run the tests"
 dsh --profile web --help            # the web app's flags, not the launcher's
-dsh --help                          # the launcher's own help
+dsh --resume <id> --help            # late help is forwarded to the CLI app
+dsh --help                          # bare help is launcher-owned
 ```
 
 ## Profile
@@ -36,7 +42,7 @@ profile 目录包含一个 `package.json`，其中记录树外插件依赖，以
 - profile 自身的 `cordis.patch.yml`，然后是 home 级的 `$DSH_HOME/cordis.patch.yml`
 - `--patch` 指定的覆盖层
 
-`dsh.profile.bundles` 中列出的组合包先从 dsh 安装目录解析（`@deepseek-ai/dsh-base`、`@deepseek-ai/dsh-web-app`、`@deepseek-ai/dsh-headless`），再从 profile 自身的 `node_modules` 解析；pnpm 会将树外插件安装到该目录。
+`dsh.profile.bundles` 中列出的组合包先从 dsh 安装目录解析（`@deepseek-ai/dsh-base`、`@deepseek-ai/dsh-cli-app`、`@deepseek-ai/dsh-web-app`、`@deepseek-ai/dsh-headless`），再从 profile 自身的 `node_modules` 解析；pnpm 会将树外插件安装到该目录。
 
 使用 `--dump-default-config` 和 `--dump-config` 可在不启动的情况下检查组合后的配置树。
 

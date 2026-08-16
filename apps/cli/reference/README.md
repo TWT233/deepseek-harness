@@ -2,19 +2,19 @@
 
 English | [中文](README.zh.md)
 
-This reference defines the profile, web-alias, plugin-management, and config-dump command modes. Argv is parsed once through [`src/args.ts`](../src/args.ts), and [`src/bin.ts`](../src/bin.ts) dynamically imports only the selected runner.
+This reference defines the interactive CLI, profile, Web-alias, plugin-management, and config-dump command modes. Argv is parsed once through [`src/args.ts`](../src/args.ts), and [`src/bin.ts`](../src/bin.ts) dynamically imports only the selected runner.
 
 ## Profile boot
 
 `dsh --profile <name>` boots the profile at `$DSH_HOME/profiles/<name>`. The effective tree is composed over an empty root by applying, in order: each bundle patch named in the profile manifest's `dsh.profile.bundles` list, the profile's own `cordis.patch.yml`, the home-level `$DSH_HOME/cordis.patch.yml` (machine-local preferences shared by every profile, so it outranks the per-profile layer), and each `--patch <path>` overlay in argv order. Later layers win per row; a patch replaces the targeted row's complete `config` value rather than deep-merging keys, and may insert new rows. A parse, schema, resolution, or plugin boot failure is reported and exits nonzero. SIGINT and SIGTERM dispose the mounted root before exit.
 
-Bundle names resolve from the dsh installation first, then from the profile directory. In-box bundles (`@deepseek-ai/dsh-base`, `@deepseek-ai/dsh-web-app`, `@deepseek-ai/dsh-headless`) therefore always come from the same installation as the running `dsh`; out-of-tree bundles come from the profile's pnpm-managed `node_modules`. A bare plugin `name` in any patch row resolves through the profile directory's Node parent-walk, which reaches the maintained installation fallback `$DSH_HOME/profiles/node_modules` (one symlink per package the installation's app and bundles depend on, healed on every launch).
+Bundle names resolve from the dsh installation first, then from the profile directory. In-box bundles (`@deepseek-ai/dsh-base`, `@deepseek-ai/dsh-cli-app`, `@deepseek-ai/dsh-web-app`, `@deepseek-ai/dsh-headless`) therefore always come from the same installation as the running `dsh`; out-of-tree bundles come from the profile's pnpm-managed `node_modules`. A bare plugin `name` in any patch row resolves through the profile directory's Node parent-walk, which reaches the maintained installation fallback `$DSH_HOME/profiles/node_modules` (one symlink per package the installation's app and bundles depend on, healed on every launch).
 
-The `web` and `headless` profiles auto-initialize from shipped templates on first use (`web`: base + web-app; `headless`: base + headless). Any other missing profile fails loud with a hint to run `dsh plugin --profile <name> add <package>`.
+The `cli`, `web`, and `headless` profiles auto-initialize from shipped templates on first use (`cli`: base + cli-app; `web`: base + web-app; `headless`: base + headless). Any other missing profile fails loud with a hint to run `dsh plugin --profile <name> add <package>`.
 
 ### App arguments
 
-The launcher's flags come first and end at the first token it does not recognize; everything from there on is handed to the booted profile verbatim through `ctx.cmdlineArgs`, where any injected app plugin may parse it ([`dsh-cmdline`](../../../packages/boot/cmdline/README.md)). `dsh --profile web --port 8080` therefore reaches the web app's `--port`, `dsh --profile web --help` prints that app's help and boots nothing, and `dsh --help` (no profile to hand it to) prints the launcher's own. `-V`/`--version` prints the launcher's version when it appears before the app-argument boundary.
+The launcher's flags come first and end at the first token it does not recognize; everything from there on is handed to the booted profile verbatim through `ctx.cmdlineArgs`, where any injected app plugin may parse it ([`dsh-cmdline`](../../../packages/boot/cmdline/README.md)). Bare `dsh` selects `cli`, and bare `dsh --resume <id>` forwards `--resume` to that app. `dsh --profile web --port 8080` reaches the Web app's `--port`; `dsh --profile web --help` and `dsh --resume <id> --help` print the selected app's help and boot nothing. Standalone bare `dsh --help`, `dsh -h`, `dsh --version`, and `dsh -V` remain launcher-owned.
 
 A composition mounts once. An ordinary plugin injects `cmdlineArgs`, parses this app's arguments, and provides what it resolved as a service; each row configured from flags injects that service, and Loader waits for it before evaluating the row's config (`port: !!js ctx.webStartup.port ?? 3080`). A flag therefore beats the value written beside it. This precedence requires the row to retain that expression; a user patch that replaces the whole `config` with literals removes the runtime read. Help and rejected arguments request exit — nonzero for a rejection, 0 for help — without activating rows that depend on the provider's service. A live `cordis.patch.yml` edit re-evaluates expressions against services that are still up, so it cannot reset a served port.
 
@@ -24,6 +24,7 @@ The shipped apps own these command lines:
 
 | Profile | Arguments |
 |---|---|
+| `cli` | optional `--resume <session-id>` |
 | `web` | `--host`, `--port`, repeatable `--trusted-host` |
 | `headless` | the task text, as the positional argument |
 
@@ -37,6 +38,18 @@ dsh --profile web --patch ./extra.yml --dump-config
 ```
 
 `--dump-default-config` prints only the bundle layers; `--dump-config` adds the profile's `cordis.patch.yml`, the home-level `$DSH_HOME/cordis.patch.yml`, and `--patch` overlays. Both print comments naming the file that supplied each row and every overlay that changed it; `!!js` expressions remain unevaluated, and unmatched patch targets are reported on stderr. A dump never runs app command-line providers, so it shows the composed tree before any app argument is resolved and rejects an invocation that carries app arguments.
+
+## Interactive terminal
+
+Bare `dsh` starts a fresh CLI Session in the invoking directory. `dsh --resume <session-id>` is the only automatic resume form: the runner inspects persistence before acquiring the terminal, requires exactly one supported `cli/session` marker consistent with the preceding `sandbox/mode` and `approval/policy` events, and requires the current directory to match `SessionHeader.cwd`. A resumed Session selects the model from its latest `request/header`; if the Session has no request header, it uses the deployment's current default model.
+
+The shipped `cli` bundle sets sandbox mode `danger-full-access`, approval policy `never`, and disables the permission-selector service. The approval service remains mounted for tool execution, but no approval answerer or approval UI is registered. A user-visible warning states that commands and tools can modify any path available to the process. The `ctx.userQuestions` provider remains interactive for model-requested structured questions.
+
+The terminal is rolling rather than full-screen. Completed items enter ordinary scrollback once; only the bounded live assistant stream, running tools, question, status, and editor are redrawn. Alt+Enter inserts a line break, Enter submits, an idle submission calls `followup()`, and a submission while the Agent runs calls `steer()`. Assistant reasoning and text stream from Session events. Tool calls and results render from presentation intents, with generic escaped fallback output when a definition or presenter is unavailable.
+
+`/help` lists effective scoped commands, `/clear` clears presentation without mutating the Session or existing scrollback, and `/exit` requests normal exit. Ctrl+C cancels active Agent work; Ctrl+C while idle exits 130. Ctrl+D or EOF exits 0. Structured questions consume input until answered or cancelled.
+
+The runner waits for Loader settlement before persistence inspection or terminal acquisition, so invalid provider or plugin configuration fails without entering raw mode. Once acquired, the terminal is restored after active cancellation followed by idle Ctrl+C, `/exit`, EOF, SIGTERM, startup failure, and plugin disposal. `/exit`, EOF, and SIGTERM exit 0.
 
 ## Plugin management
 
@@ -67,7 +80,7 @@ Process shutdown gives the plugin tree up to five seconds to dispose. The first 
 
 All modes treat the invoking directory as the default workspace root, load applicable `AGENTS.md` or `CLAUDE.md` instructions with a 65,536-byte render budget, and use an in-memory SQLite session content index. Every profile boot watches valid edits of both `cordis.patch.yml` layers (profile and home) and reapplies them transactionally; a one-shot surface exits through its bounded shutdown, which disposes the watchers.
 
-New sessions default to the `workspace-write` permission preset. Bash and filesystem mutations are restricted to the session workspace and platform temporary roots; reads, network access, and process visibility are not confined. `DSH_PERMISSION_MODE` changes the process fallback. Stored General-settings permissions affect later Web sessions, not an already-open one.
+Web sessions default to the `workspace-write` permission preset. Bash and filesystem mutations are restricted to the session workspace and platform temporary roots; reads, network access, and process visibility are not confined. `DSH_PERMISSION_MODE` changes the process fallback. Stored General-settings permissions affect later Web sessions, not an already-open one. The interactive CLI uses the full-access policy described above.
 
 `DSH_TOOLS_MODE` selects `native`, `code`, or `both` for the process; another value fails at boot. The shipped `minimal` agent preset keeps that deployment presentation, fixes the complete system prompt to `You are a helpful software engineer assistant.`, and composes only persistent `bash` plus `str_replace_editor`. Select 极简模式 when creating a Web session; every other prompt section and model-facing plugin remains absent from that agent while the shared browser, workspace, persistence, sandbox, and permission host stays in place.
 
