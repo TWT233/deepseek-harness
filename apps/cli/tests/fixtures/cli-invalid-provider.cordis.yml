@@ -1,0 +1,5 @@
+- id: agent-default-model
+  config:
+    provider:
+      - invalid-provider-shape
+    model: invalid-model

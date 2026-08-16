@@ -1,0 +1,30 @@
+- id: llm-deepseek
+  disabled: true
+
+- insert:
+    - id: cli-scripted-llm
+      name: '../tests/fixtures/cli-scripted-llm.ts'
+    - id: cli-tool-ask-user
+      name: '@deepseek-ai/dsh-tool-ask-user'
+
+- id: agent-default-model
+  config:
+    provider: cli-scripted
+    model: cli-scripted-model
+
+- id: system-prompt
+  config:
+    persona: 'You are the scripted CLI acceptance model.'
+
+- id: session-title-llm
+  disabled: true
+
+- id: session-persistence-jsonl
+  config:
+    root: !!js process.env.DSH_CLI_SESSIONS_ROOT ?? './.sessions'
+    compression: none
+
+- id: session-query-sqlite
+  config:
+    path: !!js process.env.DSH_CLI_SESSION_QUERY_PATH ?? './.sessions/session-query.db'
+    openAt: never

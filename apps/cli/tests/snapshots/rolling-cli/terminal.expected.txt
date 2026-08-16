@@ -1,0 +1,26 @@
+Warning: danger-full-access is active and approval is disabled. Commands and tools can modify any
+path available to this process.
+Run the scripted
+terminal journey
+Inspect the workspace, then apply the requested change.
+I will run the terminal check first.
+Print scripted terminal output
+$ printf "CLI_TERMINAL_OUTPUT\n"
+CLI_TERMINAL_OUTPUT
+[exit code: 0]
+create {{cwd}}/snapshot-created.txt
+--- /dev/null
++++ {{cwd}}/snapshot-created.txt
++created by the real editor
+Execution mode
+How should the scripted run proceed?
+1. Safe — Use the reviewed path.
+2. Fast — Use the shorter path.
+Select comma-separated numbers; add custom text after ";".
+> 1; reviewed
+Decision received: Safe; reviewed.
+Hold for steering.
+Second turn is waiting for steering.
+Steer with this update.
+Steering received: Steer with this update.
+> /exit
