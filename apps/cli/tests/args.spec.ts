@@ -37,6 +37,15 @@ describe('parseDshArgs', () => {
     // App flags, including its -h, and positionals reach the app verbatim.
     expect(parse(['tui']))
       .toEqual({ mode: 'profile', profile: 'cli', patches: [], args: ['tui'] })
+    expect(parse(['--resume', 's1', '--help']))
+      .toEqual({
+        mode: 'profile',
+        profile: 'cli',
+        patches: [],
+        args: ['--resume', 's1', '--help'],
+      })
+    expect(parse(['task', '-h']))
+      .toEqual({ mode: 'profile', profile: 'cli', patches: [], args: ['task', '-h'] })
     expect(parse(['--config', 'c.yml']))
       .toEqual({ mode: 'profile', profile: 'cli', patches: [], args: ['--config', 'c.yml'] })
     expect(parse(['-p', 'task']))

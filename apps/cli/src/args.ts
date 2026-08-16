@@ -135,7 +135,7 @@ export function parseDshArgs(argv: readonly string[], version: string): DshInvoc
       // Bare help stays launcher-owned; every other bare invocation selects
       // the shipped interactive CLI profile.
       if (options.profile === undefined) {
-        if (args.some(argument => argument === '-h' || argument === '--help')) program.help()
+        if (args.length === 1 && (args[0] === '-h' || args[0] === '--help')) program.help()
       }
       const profile = options.profile ?? 'cli'
       if (profile === '') program.error('error: --profile needs a name')

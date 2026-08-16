@@ -321,6 +321,12 @@ describe.skipIf(!existsSync(dshBin))('dsh BUILT bin (node lib/bin.js, no tsx)', 
     expect(help.stdout).toContain('dsh --profile web')
     expect(help.stdout).toContain('dsh plugin --profile')
     expect(help.stdout).not.toMatch(/^\s+(?:tui|meta|upgrade)\b/mu)
+    const lateHelp = await runBuiltBin(['--resume', 's1', '--help'])
+    expect(lateHelp.code).toBe(0)
+    expect(lateHelp.stderr).toBe('')
+    expect(lateHelp.stdout).toContain('Usage: dsh --profile cli')
+    expect(lateHelp.stdout).toContain('--resume <session-id>')
+    expect(lateHelp.stdout).not.toContain('dsh plugin --profile')
     for (const removed of [['tui'], ['--config', 'x.yml'], ['-p', 'task'], ['run', 'task']]) {
       const result = await runBuiltBin(removed)
       expect(result.code).toBe(1)
