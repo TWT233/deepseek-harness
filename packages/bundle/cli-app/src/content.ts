@@ -29,10 +29,14 @@ function splitLines(text: string): string[] {
   return text.split('\n')
 }
 
-function retain(text: string, kind: 'head' | 'tail', maxBytes: number): string {
-  const retainer = new TextRetainer({ kind, maxBytes })
+function retainHeadTail(
+  text: string,
+  headBytes: number,
+  tailBytes: number,
+): ReturnType<TextRetainer['finish']> {
+  const retainer = new TextRetainer({ kind: 'headTail', headBytes, tailBytes })
   retainer.push(text)
-  return retainer.finish().text
+  return retainer.finish()
 }
 
 function jsonLines(value: unknown): string[] {
@@ -93,7 +97,7 @@ export function renderContent(
 }
 
 function lineNotice(count: number): string {
-  return `… ${count} ${count === 1 ? 'line' : 'lines'} omitted …`
+  return `… ${count} lines omitted …`
 }
 
 function applyLineBound(lines: readonly string[], maxLines: number): string[] {
@@ -103,7 +107,7 @@ function applyLineBound(lines: readonly string[], maxLines: number): string[] {
 
   const headCount = Math.floor((maxLines - 1) / 2)
   const tailCount = maxLines - 1 - headCount
-  const omitted = lines.length - maxLines
+  const omitted = lines.length - headCount - tailCount
   return [
     ...lines.slice(0, headCount),
     lineNotice(omitted),
@@ -116,25 +120,27 @@ function applyByteBound(text: string, maxBytes: number): string {
   if (maxBytes === 0) return ''
 
   let notice = '… bytes omitted …'
-  let head = ''
-  let tail = ''
+  let retained = ''
   for (let iteration = 0; iteration < 4; iteration++) {
-    const separatorBytes = 2
+    const separatorBytes = 1
     const available = Math.max(0, maxBytes - byteLength(notice) - separatorBytes)
-    const headBytes = Math.floor(available / 2)
+    const headBytes = Math.ceil(available / 2)
     const tailBytes = available - headBytes
-    head = retain(text, 'head', headBytes)
-    tail = retain(text, 'tail', tailBytes)
-    const omitted = byteLength(text) - byteLength(head) - byteLength(tail)
+    const result = retainHeadTail(text, headBytes, tailBytes)
+    retained = result.text
+    /* v8 ignore next -- oversized complete input makes headTail omission exact. */
+    const omitted = result.omittedBytes.kind === 'exact'
+      ? result.omittedBytes.count
+      : 0
     const nextNotice = `… ${omitted} bytes omitted …`
     if (nextNotice === notice) break
     notice = nextNotice
   }
 
-  const complete = [head, notice, tail].join('\n')
+  const complete = retained === '' ? notice : `${retained}\n${notice}`
   return byteLength(complete) <= maxBytes
     ? complete
-    : retain(complete, 'head', maxBytes)
+    : retainHeadTail(complete, maxBytes, 0).text
 }
 
 /**

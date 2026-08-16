@@ -176,6 +176,12 @@ async function harness(): Promise<Harness> {
       return defaultSelection
     },
   } as never)
+  ctx.provide('sandboxPolicy', {
+    defaultMode: 'danger-full-access',
+  } as never)
+  ctx.provide('approval', {
+    config: { policy: 'never' },
+  } as never)
   ctx.provide('tools', { get: () => undefined } as never)
   ctx.provide('sessions', {
     flush: async () => {
@@ -365,6 +371,37 @@ describe('interactive CLI runner', () => {
     expect(test.exitCodes).toEqual([0])
   })
 
+  it('records and presents effective policy service values for a fresh Session', async () => {
+    const test = await harness()
+    Object.defineProperty(test.ctx.sandboxPolicy, 'defaultMode', {
+      value: 'workspace-write',
+    })
+    Object.defineProperty(test.ctx.approval.config, 'policy', {
+      value: undefined,
+    })
+    const { running } = await started(test)
+
+    expect(test.agent?.session.events.filter(entry => (
+      entry.type === 'sandbox/mode'
+      || entry.type === 'approval/policy'
+      || entry.type === 'cli/session'
+    )).map(entry => entry.data)).toEqual([
+      { mode: 'workspace-write' },
+      { policy: 'ask' },
+      {
+        version: 1,
+        sandboxMode: 'workspace-write',
+        approvalPolicy: 'ask',
+      },
+    ])
+    expect(test.terminal.items.some(item => item.lines.includes(
+      'Sandbox mode: workspace-write. Approval policy: ask.',
+    ))).toBe(true)
+
+    test.terminal.send({ kind: 'eof' })
+    await running
+  })
+
   it('preflights resume before terminal start and uses the latest logged model', async () => {
     const test = await harness()
     const id = SessionId('resume-model')
@@ -546,6 +583,24 @@ describe('interactive CLI runner', () => {
       answers: [{ id: 'confirm', selected: ['Yes'] }],
     })
     expect(test.followup).not.toHaveBeenCalled()
+    test.terminal.send({ kind: 'eof' })
+    await running
+  })
+
+  it('cancels running Agent work when Ctrl+C also cancels an active question', async () => {
+    const test = await harness()
+    const { running } = await started(test)
+    Object.assign(test.agent as Agent, { status: 'running' })
+    const question = test.ctx.userQuestions.ask({
+      agent: test.agent as Agent,
+      questions: [{ id: 'confirm', question: 'Proceed?' }],
+    })
+
+    test.terminal.send({ kind: 'interrupt' })
+
+    await expect(question).rejects.toThrow('question cancelled by user')
+    expect(test.cancel).toHaveBeenCalledExactlyOnceWith({ kind: 'user' })
+    Object.assign(test.agent as Agent, { status: 'idle' })
     test.terminal.send({ kind: 'eof' })
     await running
   })

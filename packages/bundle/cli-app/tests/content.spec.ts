@@ -75,12 +75,17 @@ describe('bounded tool lines', () => {
     expect(boundToolLines(
       ['1', '2', '3', '4'],
       { maxLines: 3, maxBytes: 32_768 },
-    )).toEqual(['1', '… 1 line omitted …', '4'])
+    )).toEqual(['1', '… 2 lines omitted …', '4'])
 
     expect(boundToolLines(
       ['1', '2', '3', '4', '5', '6'],
       { maxLines: 4, maxBytes: 32_768 },
-    )).toEqual(['1', '… 2 lines omitted …', '5', '6'])
+    )).toEqual(['1', '… 3 lines omitted …', '5', '6'])
+
+    expect(boundToolLines(
+      ['1', '2'],
+      { maxLines: 1, maxBytes: 32_768 },
+    )).toEqual(['… 2 lines omitted …'])
   })
 
   it('uses TextRetainer cuts without emitting invalid UTF-8', () => {

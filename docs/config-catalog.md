@@ -391,7 +391,7 @@ Source: [`packages/shell/bash-sandbox/src/index.ts:35`](../packages/shell/bash-s
 
 ## `@deepseek-ai/dsh-cli-app`
 
-Requires: `agentDefaultModel` · `agents` · `commands` · `sessionPersistence` · `sessions` · `tools` · `userQuestions` · `CLI_STARTUP_SERVICE`
+Requires: `agentDefaultModel` · `agents` · `approval` · `commands` · `sandboxPolicy` · `sessionPersistence` · `sessions` · `tools` · `userQuestions` · `CLI_STARTUP_SERVICE`
 
 ```ts config-catalog
 /** Transcript visibility and output bounds. */
@@ -405,7 +405,7 @@ export interface Config {
 }
 ```
 
-Source: [`packages/bundle/cli-app/src/index.ts:38`](../packages/bundle/cli-app/src/index.ts)
+Source: [`packages/bundle/cli-app/src/index.ts:40`](../packages/bundle/cli-app/src/index.ts)
 
 <a id="deepseek-aidsh-client-connection"></a>
 

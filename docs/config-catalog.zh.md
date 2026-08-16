@@ -393,7 +393,7 @@ export type Config = LocalConfig
 
 ## `@deepseek-ai/dsh-cli-app`
 
-需要：`agentDefaultModel` · `agents` · `commands` · `sessionPersistence` · `sessions` · `tools` · `userQuestions` · `CLI_STARTUP_SERVICE`
+需要：`agentDefaultModel` · `agents` · `approval` · `commands` · `sandboxPolicy` · `sessionPersistence` · `sessions` · `tools` · `userQuestions` · `CLI_STARTUP_SERVICE`
 
 ```ts config-catalog
 /** Transcript visibility and output bounds. */
@@ -407,7 +407,7 @@ export interface Config {
 }
 ```
 
-来源：[`packages/bundle/cli-app/src/index.ts:38`](../packages/bundle/cli-app/src/index.ts)
+来源：[`packages/bundle/cli-app/src/index.ts:40`](../packages/bundle/cli-app/src/index.ts)
 
 <a id="deepseek-aidsh-client-connection"></a>
 

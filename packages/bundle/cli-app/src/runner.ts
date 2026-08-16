@@ -25,12 +25,17 @@ import {
 import { CliTranscriptProjector } from './transcript.ts'
 import type {
   CliStartupValues,
+  CliSessionMarker,
   CliTranscriptConfig,
   RollingTerminalInput,
   RollingTerminalPort,
 } from './types.ts'
 
 const FULL_ACCESS_WARNING = 'Warning: danger-full-access is active and approval is disabled. Commands and tools can modify any path available to this process.'
+const FULL_ACCESS_POLICY: Record<CliSessionMarker['approvalPolicy'], string> = {
+  never: FULL_ACCESS_WARNING,
+  ask: 'Warning: danger-full-access is active. Commands and tools can modify any path available to this process. Approval policy: ask.',
+}
 
 /** Factory boundary used to substitute a fake rolling terminal in tests. */
 export type CliTerminalFactory = () => RollingTerminalPort
@@ -98,15 +103,19 @@ function installSelection(
 function startupItem(
   terminal: RollingTerminalPort,
   sessionId: SessionId,
+  marker: CliSessionMarker,
   order: number,
 ): void {
+  const policy = marker.sandboxMode === 'danger-full-access'
+    ? FULL_ACCESS_POLICY[marker.approvalPolicy]
+    : `Sandbox mode: ${marker.sandboxMode}. Approval policy: ${marker.approvalPolicy}.`
   terminal.upsert({
     id: 'cli:startup',
     order,
     settled: true,
     lines: [
       displayText(`Session ID: ${sessionId}`),
-      displayText(FULL_ACCESS_WARNING),
+      displayText(policy),
     ],
   })
 }
@@ -121,6 +130,9 @@ function inputHandler(
 ): (input: RollingTerminalInput) => void {
   return (input) => {
     if (questions.accept(input)) {
+      if (input.kind === 'interrupt' && agent.status === 'running') {
+        agent.cancel({ kind: 'user' })
+      }
       if (input.kind === 'eof') requestExit(0)
       return
     }
@@ -260,15 +272,16 @@ export async function runCli(
     agent.ctx.on('session/event', (session, event) => {
       if (session === agent.session) projector.accept(event)
     })
-    if (plan === undefined) {
-      appendCliSessionMarker(agent.session, {
+    const marker = plan === undefined
+      ? {
         version: 1,
-        sandboxMode: 'danger-full-access',
-        approvalPolicy: 'never',
-      })
-    }
+        sandboxMode: ctx.sandboxPolicy.defaultMode,
+        approvalPolicy: ctx.approval.config.policy ?? 'ask',
+      } as const
+      : readCliSessionMarker(plan.events)
+    if (plan === undefined) appendCliSessionMarker(agent.session, marker)
     projector.replay(agent.session.events)
-    startupItem(terminal, agent.session.id, agent.session.seq)
+    startupItem(terminal, agent.session.id, marker, agent.session.seq)
     terminal.start(inputHandler(
       ctx,
       agent,

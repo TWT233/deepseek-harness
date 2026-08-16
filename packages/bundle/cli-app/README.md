@@ -18,7 +18,7 @@ The rolling renderer commits settled lines to ordinary scrollback and redraws on
 
 `appendCliSessionMarker()` writes `sandbox/mode`, `approval/policy`, then the required `cli/session` marker. `readCliSessionMarker()` requires exactly one supported marker and verifies that its sandbox mode and approval policy match the preceding policy events. The package invariant applies the same relation to loaded logs and new `session/event` candidates only after a marker exists, so Web and Headless Sessions plus a fresh CLI's policy events before its marker remain valid. Resume also requires the recorded workspace and selects the latest logged request model, falling back to the deployment default only for a blank Session.
 
-The shipped patch sets `danger-full-access` and approval policy `never`, disables the permission selector, and mounts no approval UI. The startup block prints the exact Session ID for later explicit resume and the full-access warning. Loader or provider configuration fails before terminal acquisition; after acquisition, plugin disposal drains the Agent and Session before restoring the terminal.
+The shipped patch sets `danger-full-access` and approval policy `never`, disables the permission selector, and mounts no approval UI. A higher profile or home patch may replace those policy rows; a fresh Session records the effective service values, and its startup block prints the exact Session ID plus those policies. The shipped defaults use the full-access warning. Loader or provider configuration fails before terminal acquisition; after acquisition, plugin disposal drains the Agent and Session before restoring the terminal.
 
 ## Model Experience
 
@@ -32,4 +32,4 @@ The package adds no independent prompt section or tool schema. Cache changes com
 
 - The process requires TTY stdin and stdout.
 - Resume is explicit, accepts only CLI Sessions from the same workspace, and has no cross-process lease; concurrent processes can race the same Session.
-- The shipped CLI has no approval UI and no runtime permission selector. A higher profile or home patch can replace bundle policy, but the CLI runner currently records the shipped `danger-full-access` and `never` values for fresh Session identity.
+- The CLI has no approval UI and no runtime permission selector. Replacing the default `never` policy with `ask` still fails closed unless another patch mounts an approval answerer.

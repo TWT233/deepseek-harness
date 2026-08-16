@@ -7,6 +7,9 @@ import { Command } from 'commander'
 import type { Context } from '@deepseek-ai/cordis'
 import { parseCmdline } from '@deepseek-ai/dsh-cmdline'
 import { SessionId } from '@deepseek-ai/dsh-session'
+import type { CliStartupValues } from './types.ts'
+
+export type { CliStartupValues } from './types.ts'
 
 /** Stable Cordis plugin name. */
 export const name = 'cli-startup'
@@ -16,12 +19,6 @@ export const inject = ['cmdlineArgs']
 
 /** Service provided to the interactive CLI runner. */
 export const CLI_STARTUP_SERVICE = 'cliStartup'
-
-/** Startup selection resolved from the interactive CLI command line. */
-export interface CliStartupValues {
-  /** Existing CLI Session requested for resume. */
-  readonly resumeSessionId?: SessionId
-}
 
 /**
  * Parse the interactive CLI command line and publish its startup selection.

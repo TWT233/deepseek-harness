@@ -26,7 +26,9 @@ export const name = 'cli-runner'
 export const inject = [
   'agentDefaultModel',
   'agents',
+  'approval',
   'commands',
+  'sandboxPolicy',
   'sessionPersistence',
   'sessions',
   'tools',

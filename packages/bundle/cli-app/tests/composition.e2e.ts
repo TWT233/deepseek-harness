@@ -34,6 +34,35 @@ const roots: string[] = []
 const contexts: Context[] = []
 const originalDshHome = process.env.DSH_HOME
 
+const policyCases = [
+  {
+    label: 'shipped full-access policy',
+    overlays: [],
+    sandboxMode: 'danger-full-access',
+    approvalPolicy: 'never',
+    startupText: 'danger-full-access is active and approval is disabled',
+  },
+  {
+    label: 'higher policy overlay',
+    overlays: [
+      { id: 'sandbox-policy', config: { mode: 'workspace-write' } },
+      { id: 'approval', config: { policy: 'ask' } },
+    ],
+    sandboxMode: 'workspace-write',
+    approvalPolicy: 'ask',
+    startupText: 'Sandbox mode: workspace-write. Approval policy: ask.',
+  },
+  {
+    label: 'full-access policy with approval questions',
+    overlays: [
+      { id: 'approval', config: { policy: 'ask' } },
+    ],
+    sandboxMode: 'danger-full-access',
+    approvalPolicy: 'ask',
+    startupText: 'danger-full-access is active. Commands and tools can modify any path',
+  },
+] as const
+
 class FakeTerminal implements RollingTerminalPort {
   readonly items: RollingTerminalItem[] = []
 
@@ -62,7 +91,12 @@ afterEach(async () => {
 })
 
 describe('shipped CLI Loader composition', () => {
-  it('mounts full access without permission UI and creates one CLI Session', async () => {
+  it.each(policyCases)('records the $label in one CLI Session', async ({
+    overlays,
+    sandboxMode,
+    approvalPolicy,
+    startupText,
+  }) => {
     const manifest = JSON.parse(
       readFileSync(join(packageRoot, 'package.json'), 'utf8'),
     ) as { dsh?: { bundle?: { patch?: string } } }
@@ -92,6 +126,7 @@ describe('shipped CLI Loader composition', () => {
     const ctx = await boot('dsh-cli-composition', configPath, [
       ...loadOverlayPatches('dsh-cli-composition', basePatch),
       ...loadOverlayPatches('dsh-cli-composition', cliPatch),
+      ...overlays,
       { id: 'cli-startup', disabled: true },
       {
         insert: [{
@@ -139,17 +174,17 @@ describe('shipped CLI Loader composition', () => {
         && (entry.fiber === undefined || entry.fiber.state !== FiberState.ACTIVE))
       .map(entry => entry.options.id ?? entry.options.name)
     expect(unsettled).toEqual([])
-    expect(ctx.sandboxPolicy.defaultMode).toBe('danger-full-access')
-    expect(ctx.approval.config.policy).toBe('never')
+    expect(ctx.sandboxPolicy.defaultMode).toBe(sandboxMode)
+    expect(ctx.approval.config.policy).toBe(approvalPolicy)
     expect(ctx.get('permissionPresets')).toBeUndefined()
     expect(sessions.flatMap(session => session.events)
       .filter(event => event.type === 'cli/session')
       .map(event => event.data)).toEqual([{
       version: 1,
-      sandboxMode: 'danger-full-access',
-      approvalPolicy: 'never',
+      sandboxMode,
+      approvalPolicy,
     }])
     expect(terminal.items.some(item => item.lines.some(line =>
-      line.includes('danger-full-access')))).toBe(true)
+      line.includes(startupText)))).toBe(true)
   })
 })

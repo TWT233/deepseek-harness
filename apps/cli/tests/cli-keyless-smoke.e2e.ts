@@ -144,6 +144,27 @@ describe('rolling CLI keyless PTY lifecycle', () => {
     expectTerminalRestored(output)
   })
 
+  it('aborts an active structured question and its turn with one Ctrl+C', async () => {
+    const output = await smoke({
+      label: 'CLI question Ctrl+C',
+      expectedExitCode: 130,
+      actions: [
+        {
+          waitFor: 'danger-full-access is active',
+          send: 'Run the scripted terminal journey.\r',
+        },
+        {
+          waitFor: 'How should the scripted run proceed?',
+          send: '\u0003',
+        },
+        { waitFor: 'Turn aborted: user', send: '\u0003' },
+      ],
+    })
+    expect(output).toContain('How should the scripted run proceed?')
+    expect(output).toContain('Turn aborted: user')
+    expectTerminalRestored(output)
+  })
+
   it('clears terminal presentation while retaining the completed turn in Session', async () => {
     let session = ''
     const output = await smoke({

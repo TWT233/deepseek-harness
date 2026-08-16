@@ -18,7 +18,7 @@ Status: implemented
 
 裸 `dsh --resume <id>` 选择同一 profile，并把 `--resume` 转发给其 startup 插件。独立的裸帮助和版本仍由启动器处理；应用参数边界之后的帮助会转发给选中的应用。启动器 flag 必须位于应用参数前，因此 `--patch` 位于 `--resume` 前。
 
-随附的 CLI profile 采用沙箱模式 `danger-full-access`、审批策略 `never`，且不提供权限选择器或审批 UI。工具执行仍消费审批服务，其确定性的 `never` 策略无需 answerer（应答方）。稳定启动块会显示精确 Session ID 以供之后显式恢复，并警告用户命令和工具可以修改该进程能够访问的任何路径。模型请求的用户问题仍通过 `ctx.userQuestions` 交互处理。
+随附的 CLI profile 默认采用沙箱模式 `danger-full-access`、审批策略 `never`，且不提供权限选择器或审批 UI。工具执行仍消费审批服务，其确定性的 `never` 策略无需 answerer（应答方）。后续 patch 层可以替换这两个策略行；新 Session 身份会记录生效的服务值。稳定启动块会显示精确 Session ID 以供之后显式恢复，并说明这些策略；使用随附默认值时，它会显示完整访问警告。模型请求的用户问题仍通过 `ctx.userQuestions` 交互处理。
 
 ## Package and profile
 

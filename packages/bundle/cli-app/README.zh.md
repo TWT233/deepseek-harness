@@ -18,7 +18,7 @@ startup 入口通过启动器持有的 [`dsh-cmdline`](../../boot/cmdline/README
 
 `appendCliSessionMarker()` 依次写入 `sandbox/mode`、`approval/policy` 和必需的 `cli/session` marker（标记）。`readCliSessionMarker()` 要求恰好一个受支持 marker，并校验其 sandbox mode（沙箱模式）和 approval policy（审批策略）与之前的策略事件一致。包 invariant（不变量）仅在 marker 已存在后，对已加载日志与新的 `session/event` candidate（候选事件）应用同一关系，因此 Web 和 Headless Session，以及新 CLI 写入 marker 前的策略事件仍然有效。恢复还要求记录的 workspace（工作区），并选择最新记录的请求模型；只有空白 Session 才回退到部署默认模型。
 
-随附 patch 设置 `danger-full-access` 和 `never` 审批策略，禁用权限选择器，并且不挂载审批 UI。启动块会显示精确 Session ID 以供之后显式恢复，并显示完整访问警告。Loader 或 provider 配置会在获取终端前失败；获取终端后，插件 dispose（资源释放）会先排空 Agent 和 Session，再恢复终端。
+随附 patch 设置 `danger-full-access` 和 `never` 审批策略，禁用权限选择器，并且不挂载审批 UI。更高层的 profile 或 home patch 可以替换这些策略行；新 Session 会记录生效的服务值，其启动块会显示精确 Session ID 和这些策略。随附默认值使用完整访问警告。Loader 或 provider 配置会在获取终端前失败；获取终端后，插件 dispose（资源释放）会先排空 Agent 和 Session，再恢复终端。
 
 ## 模型体验
 
@@ -32,4 +32,4 @@ startup 入口通过启动器持有的 [`dsh-cmdline`](../../boot/cmdline/README
 
 - 进程需要 TTY stdin 与 stdout。
 - 恢复必须显式请求，只接受同一 workspace 中的 CLI Session，且没有跨进程 lease（租约）；并发进程可能竞争同一 Session。
-- 随附 CLI 没有审批 UI 和运行时权限选择器。更高层的 profile 或 home patch 可以替换组合包策略，但 CLI 运行器目前会为新 Session 身份记录随附的 `danger-full-access` 和 `never` 值。
+- CLI 没有审批 UI 和运行时权限选择器。把默认 `never` 策略替换为 `ask` 后，如果没有其他 patch 挂载审批 answerer，审批仍会以 fail-closed（失败时关闭）的方式拒绝。

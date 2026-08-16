@@ -43,7 +43,7 @@ dsh --profile web --patch ./extra.yml --dump-config
 
 裸 `dsh` 在调用目录中启动一个新的 CLI Session（会话），并在编辑器前显示其精确 Session ID。`dsh --resume <session-id>` 是唯一的自动恢复形式：运行器会在获取终端前检查持久化数据，要求恰好一个受支持的 `cli/session` marker（标记），且该标记与之前的 `sandbox/mode` 和 `approval/policy` 事件一致，同时要求当前目录与 `SessionHeader.cwd` 匹配。恢复后的 Session 从最新 `request/header` 选择模型；如果 Session 没有请求 header，则使用部署当前的默认模型。
 
-随附的 `cli` 组合包把沙箱模式设为 `danger-full-access`，把审批策略设为 `never`，并禁用权限选择服务。工具执行仍需要并保留审批服务，但不会注册审批 answerer 或审批 UI。用户可见警告会说明命令和工具可以修改该进程能够访问的任何路径。模型请求的结构化问题仍由 `ctx.userQuestions` provider（提供方）交互处理。
+随附的 `cli` 组合包把沙箱模式设为 `danger-full-access`，把审批策略设为 `never`，并禁用权限选择服务。工具执行仍需要并保留审批服务，但不会注册审批 answerer 或审批 UI。启动块会说明生效的策略值；使用随附默认值时，它会警告命令和工具可以修改该进程能够访问的任何路径。后续的 profile、home 或命令行 patch 可以替换策略行，新 Session 会记录这些生效的服务值。模型请求的结构化问题仍由 `ctx.userQuestions` provider（提供方）交互处理。
 
 终端采用滚动式而非全屏界面。完成的条目只进入普通 scrollback（回滚缓冲区）一次；系统只重绘有界的实时 assistant 流、运行中的工具、问题、状态和编辑器。Alt+Enter 插入换行，Enter 提交；Agent 空闲时提交会调用 `followup()`，Agent 运行时提交会调用 `steer()`。assistant 的推理与文本从 Session 事件流式显示。工具调用和结果按照呈现意图渲染；定义或 presenter（呈现器）不可用时，显示通用且已转义的回退内容。
 
