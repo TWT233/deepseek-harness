@@ -774,16 +774,11 @@
       ]
     },
     "packages/bundle/cli-app": {
+      "entry": [
+        "tests/**/*.e2e.ts"
+      ],
       "ignoreDependencies": [
-        "@deepseek-ai/dsh-agent-default-model",
-        "@deepseek-ai/dsh-agent-tool-presentation",
-        "@deepseek-ai/dsh-commands",
-        "@deepseek-ai/dsh-output-retention",
-        "@deepseek-ai/dsh-session-persistence",
-        "@deepseek-ai/dsh-tools",
-        "@deepseek-ai/dsh-user-questions",
-        "@mariozechner/pi-tui",
-        "@deepseek-ai/schemastery"
+        "@deepseek-ai/dsh-agent-tool-presentation"
       ]
     },
     "packages/bundle/headless": {
