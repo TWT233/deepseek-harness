@@ -57,9 +57,13 @@ function processTerminalFactory(): ReturnType<CliTerminalFactory> {
   return createRollingTerminal(new ProcessTerminalDevice(), {})
 }
 
-/** Process-owned terminal substitution point used by focused tests. */
-export const internals: { terminalFactory: CliTerminalFactory } = {
+/** Process-owned terminal and stderr substitution points used by focused tests. */
+export const internals: {
+  terminalFactory: CliTerminalFactory
+  stderr: { write(chunk: string): unknown }
+} = {
   terminalFactory: processTerminalFactory,
+  stderr: process.stderr,
 }
 
 /**
@@ -90,6 +94,10 @@ export function apply(ctx: Context, config: Config): void {
     )
     void outcome.then((result) => {
       if (result.ok || shutdown.signal.aborted) return
+      const message = result.error instanceof Error
+        ? result.error.message
+        : String(result.error)
+      internals.stderr.write(`dsh: ${message}\n`)
       ctx.logger.error(result.error)
       exit(1)
     })

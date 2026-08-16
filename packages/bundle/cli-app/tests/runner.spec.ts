@@ -286,7 +286,7 @@ const config: Config = {
   maxToolOutputBytes: 32_768,
   showReasoning: true,
 }
-const productionTerminalFactory = internals.terminalFactory
+const productionInternals = { ...internals }
 
 async function started(
   test: Harness,
@@ -815,6 +815,7 @@ describe('interactive CLI runner', () => {
 describe('interactive CLI plugin', () => {
   beforeEach(() => {
     internals.terminalFactory = () => new FakeTerminal()
+    internals.stderr = { write: () => true }
   })
 
   it('exports the loader-safe root plugin and validates transcript config defaults', () => {
@@ -839,7 +840,7 @@ describe('interactive CLI plugin', () => {
   })
 
   it('rejects non-TTY production streams before raw mode', () => {
-    expect(() => productionTerminalFactory()).toThrow(
+    expect(() => productionInternals.terminalFactory()).toThrow(
       'requires TTY stdin and stdout',
     )
   })
@@ -856,14 +857,14 @@ describe('interactive CLI plugin', () => {
         configurable: true,
         value: false,
       })
-      expect(() => productionTerminalFactory()).toThrow(
+      expect(() => productionInternals.terminalFactory()).toThrow(
         'requires TTY stdin and stdout',
       )
       Object.defineProperty(process.stdout, 'isTTY', {
         configurable: true,
         value: true,
       })
-      const terminal = productionTerminalFactory()
+      const terminal = productionInternals.terminalFactory()
       expect(typeof terminal.start).toBe('function')
       expect(typeof terminal.stop).toBe('function')
     } finally {
@@ -878,6 +879,7 @@ describe('interactive CLI plugin', () => {
     const ctx = new Context()
     const exits: number[] = []
     const errors: unknown[] = []
+    let stderr = ''
     ctx.logger.error = (error: unknown) => {
       errors.push(error)
       return ctx.logger
@@ -886,14 +888,49 @@ describe('interactive CLI plugin', () => {
       exits.push(code)
     })
     ctx.provide('cliStartup', {})
-    ctx.provide('loader', { await: () => Promise.reject(new Error('loader failed')) } as never)
+    const rejected = {
+      then(_resolve: (value: never) => void, reject: (reason: unknown) => void): void {
+        reject('loader failed')
+      },
+    }
+    ctx.provide('loader', { await: () => rejected } as never)
     internals.terminalFactory = () => new FakeTerminal()
+    internals.stderr = {
+      write(chunk: string) {
+        stderr += chunk
+        return true
+      },
+    }
 
     apply(ctx, config)
     await vi.waitFor(() => {
       expect(exits).toEqual([1])
     })
-    expect(errors).toEqual([expect.objectContaining({ message: 'loader failed' })])
+    expect(errors).toEqual(['loader failed'])
+    expect(stderr).toBe('dsh: loader failed\n')
+  })
+
+  it('writes a fatal non-TTY diagnostic to process stderr before exit 1', async () => {
+    const test = await harness()
+    let stderr = ''
+    test.ctx.provide('cliStartup', {})
+    internals.terminalFactory = productionInternals.terminalFactory
+    internals.stderr = {
+      write(chunk: string) {
+        test.calls.push('stderr')
+        stderr += chunk
+        return true
+      },
+    }
+
+    apply(test.ctx, config)
+    await vi.waitFor(() => {
+      expect(test.exitCodes).toEqual([1])
+    })
+    expect(test.calls.slice(-2)).toEqual(['stderr', 'appExit:1'])
+    expect(stderr).toBe(
+      'dsh: interactive CLI requires TTY stdin and stdout\n',
+    )
   })
 
   it('aborts and awaits the runner during plugin unload', async () => {
@@ -950,6 +987,7 @@ describe('interactive CLI plugin', () => {
     const test = await harness()
     const failure = new Error('terminal stop failed during unload')
     const errors: unknown[] = []
+    let stderr = ''
     test.terminal.stopError = failure
     test.ctx.logger.error = (error: unknown) => {
       errors.push(error)
@@ -957,6 +995,12 @@ describe('interactive CLI plugin', () => {
     }
     test.ctx.provide('cliStartup', {})
     internals.terminalFactory = test.terminalFactory
+    internals.stderr = {
+      write(chunk: string) {
+        stderr += chunk
+        return true
+      },
+    }
     const plugin = test.ctx.plugin({
       name: 'cli-runner-test',
       inject,
@@ -974,6 +1018,7 @@ describe('interactive CLI plugin', () => {
       && error.message === 'interactive CLI teardown failed'
       && error.errors.includes(failure)
     ))).toBe(true)
+    expect(stderr).toBe('')
     expect(test.calls.slice(-5)).toEqual([
       'agent.cancel',
       'agent.whenIdle',
