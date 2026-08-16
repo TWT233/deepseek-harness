@@ -1,0 +1,6 @@
+# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
+# side as of the last confirmed-consistent state. Both languages carry equal authority;
+# after editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/proposed/feature/2026-08-16-rolling-terminal-cli.md
+2026-08-16-rolling-terminal-cli.md: bc6a27d83b8f2658133080bf802e689916709125
+2026-08-16-rolling-terminal-cli.zh.md: 91a02b38932ebf1a7277704f0b77d43f9c69b1c5
