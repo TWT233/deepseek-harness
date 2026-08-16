@@ -194,7 +194,16 @@ describe('tool intent rendering', () => {
   })
 
   it('renders every optional generic, terminal, diff, read, search, and web result field', () => {
-    expect(renderToolResultView({ card: 'generic' })).toEqual([])
+    expect(renderToolResultView(
+      { card: 'generic' },
+      { showReasoning: true },
+      [{ type: 'text', text: 'raw result' }],
+    )).toEqual(['raw result'])
+    expect(renderToolResultView(
+      { card: 'generic', title: 'Finished' },
+      { showReasoning: true },
+      [{ type: 'text', text: 'raw result' }],
+    )).toEqual(['Finished', 'raw result'])
     expect(renderToolResultView({ card: 'terminal' })).toEqual([])
     expect(renderToolResultView({
       card: 'diff',
@@ -314,7 +323,7 @@ describe('tool presenter projection', () => {
       callId: CallId('call-2'),
       order: 9,
       replacesPending: true,
-      lines: ['Scoped result'],
+      lines: ['Scoped result', 'raw'],
     })
     expect(seen).toEqual({ path: 'a.ts' })
     expect(scopes).toEqual([agent, agent])

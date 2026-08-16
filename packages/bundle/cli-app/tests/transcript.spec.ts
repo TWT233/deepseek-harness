@@ -364,18 +364,15 @@ describe('CLI transcript projector', () => {
 
     expect(terminal.active.get('tool:meta')?.lines).toEqual([
       'Done {"page":1}',
+      'raw',
     ])
   })
 
-  it('keeps the pending title when a result presenter omits its title', () => {
+  it('keeps the pending title and raw content when a generic result omits both', () => {
     ctx.set('tools', {
       get: () => ({
         presentCall: () => ({ card: 'generic', title: 'Pending' }),
-        presentResult: () => ({
-          card: 'terminal',
-          output: 'complete',
-          exitCode: 0,
-        }),
+        presentResult: () => ({ card: 'generic' }),
       }),
     })
     const local = new CliTranscriptProjector(ctx, agent, terminal, {
@@ -388,8 +385,31 @@ describe('CLI transcript projector', () => {
 
     expect(terminal.active.get('tool:untitled-result')?.lines).toEqual([
       'Pending',
-      'complete',
-      '[exit code: 0]',
+      'raw',
+    ])
+  })
+
+  it('replays a title-only generic result with raw content under the replacement title', () => {
+    ctx.set('tools', {
+      get: () => ({
+        presentCall: () => ({ card: 'generic', title: 'Pending' }),
+        presentResult: () => ({ card: 'generic', title: 'Finished' }),
+      }),
+    })
+    const local = new CliTranscriptProjector(ctx, agent, terminal, {
+      showReasoning: true,
+      maxToolOutputLines: 12,
+      maxToolOutputBytes: 32_768,
+    })
+
+    local.replay([
+      toolCall(1, 'replay-generic'),
+      toolResult(2, 'replay-generic', 'raw replay'),
+    ])
+
+    expect(terminal.active.get('tool:replay-generic')?.lines).toEqual([
+      'Finished',
+      'raw replay',
     ])
   })
 

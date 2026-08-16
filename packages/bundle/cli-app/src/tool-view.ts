@@ -134,12 +134,11 @@ export function renderToolCallView(
 function renderGenericResult(
   view: Extract<ToolResultView, { card: 'generic' }>,
   options: ContentRenderOptions,
+  rawContent: readonly ContentBlock[],
 ): string[] {
   return [
     ...view.title === undefined ? [] : [escapeControls(view.title)],
-    ...view.content === undefined
-      ? []
-      : renderContent(view.content, options),
+    ...renderContent(view.content ?? rawContent, options),
   ]
 }
 
@@ -206,15 +205,17 @@ function renderWebResult(view: Extract<ToolResultView, { card: 'web' }>): string
  * Render one current result-intent discriminant into terminal lines.
  * @param view - tool-owned result presentation.
  * @param options - content visibility.
+ * @param rawContent - model-facing result content used when a generic view omits content.
  * @returns escaped terminal lines.
  */
 export function renderToolResultView(
   view: ToolResultView,
   options: ContentRenderOptions = { showReasoning: true },
+  rawContent: readonly ContentBlock[] = [],
 ): string[] {
   switch (view.card) {
     case 'generic':
-      return renderGenericResult(view, options)
+      return renderGenericResult(view, options, rawContent)
     case 'terminal':
       return renderTerminalResult(view)
     case 'diff':
@@ -337,7 +338,7 @@ export class ToolViewProjector {
       replacesPending: view?.title !== undefined,
       lines: view === undefined
         ? genericResultLines(input, this.options)
-        : renderToolResultView(view, this.options),
+        : renderToolResultView(view, this.options, input.content),
     }
   }
 }
