@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
+import { displayText } from '../src/display.ts'
 import type { RollingTerminalInput } from '../src/types.ts'
 import {
   ProcessTerminalDevice,
@@ -46,7 +47,7 @@ class FakeTerminalDevice implements TerminalDevice {
   write(data: string): void {
     this.writes.push(data)
     if (data === '\x1b[?25l') this.cursorVisible = false
-    if (data === '\x1b[?25h') this.cursorVisible = true
+    if (data.endsWith('\x1b[?25h')) this.cursorVisible = true
     if (data === '\x1b[2J\x1b[H') {
       this.scrollback.length = 0
       this.activeLines = []
@@ -55,7 +56,10 @@ class FakeTerminalDevice implements TerminalDevice {
     } else if (data.startsWith('\r\x1b[2K')) {
       this.activeLines = []
     } else if (!data.includes('\x1b')) {
-      this.activeLines = data.split('\r\n')
+      const lines = data.split('\r\n')
+      const overflow = Math.max(0, lines.length - this.rows)
+      this.scrollback.push(...lines.slice(0, overflow))
+      this.activeLines = lines.slice(overflow)
     }
   }
 
@@ -141,12 +145,44 @@ describe('rolling terminal', () => {
       id: 'a',
       order: 1,
       settled: true,
-      lines: ['safe\x1b[31m'],
+      lines: [displayText('safe\x1b[31m')],
     })
     device.input('\x1b[200~paste\x1b[31m\x1b[201~')
 
     expect(device.scrollback).toEqual(['safe\\x1B[31m'])
     expect(device.activeLines).toContain('> paste\\x1B[31m')
+  })
+
+  it('preserves trusted renderer ANSI around sanitized text', () => {
+    const { device, terminal } = setup()
+    const styled = `\x1b[2m${displayText('safe\x1b[31m')}\x1b[0m`
+
+    terminal.upsert({
+      id: 'styled',
+      order: 1,
+      settled: false,
+      lines: [styled],
+    })
+
+    expect(device.writes).toContain(`${styled}\r\n> `)
+    expect(device.writes.join('')).not.toContain('\\x1B[2m')
+  })
+
+  it('bounds unsettled rendering to the viewport without leaking scrollback', () => {
+    const device = new FakeTerminalDevice()
+    device.rows = 3
+    const terminal = createRollingTerminal(device, {})
+    terminal.start(() => {})
+    const lines = ['live-1', 'live-2', 'live-3', 'live-4', 'live-5']
+
+    terminal.upsert({ id: 'live', order: 1, settled: false, lines })
+
+    expect(device.scrollback).toEqual([])
+    expect(device.activeLines).toHaveLength(3)
+    expect(device.activeLines).toEqual(['live-4', 'live-5', '> '])
+
+    terminal.upsert({ id: 'live', order: 1, settled: true, lines })
+    expect(device.scrollback).toEqual(lines)
   })
 
   it('rewraps the active region after terminal resize', () => {
@@ -162,6 +198,27 @@ describe('rolling terminal', () => {
 
     device.resize(5)
     expect(device.activeLines).toEqual(['alpha', 'beta', '> '])
+  })
+
+  it('shows and positions the cursor through multiline redraws', () => {
+    const { device } = setup()
+
+    device.resize(6)
+    device.input('abcdef')
+    expect(device.writes.at(-1)).toBe('\r\x1b[5C\x1b[?25h')
+
+    device.input('\x1b[A')
+    expect(device.writes.at(-1)).toBe('\r\x1b[1A\x1b[5C\x1b[?25h')
+    expect(device.cursorVisible).toBe(true)
+  })
+
+  it('positions an empty disabled editor cursor at its first column', () => {
+    const device = new FakeTerminalDevice()
+    const terminal = createRollingTerminal(device, { inputEnabled: false })
+
+    terminal.start(() => {})
+
+    expect(device.writes.at(-1)).toBe('\r\x1b[2C\x1b[?25h')
   })
 
   it('clears screen state and redraws only an empty editor', () => {

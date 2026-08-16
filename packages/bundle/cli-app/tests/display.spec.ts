@@ -6,8 +6,9 @@ describe('terminal display text', () => {
   it('escapes terminal control bytes before rendering', () => {
     expect(displayText('safe\u001b[31mred\u009b')).toBe('safe\\x1B[31mred\\x9B')
     expect(displayText('\u0000\t\u0007\u0008\r\u007f\u0080\u009f')).toBe(
-      '\\x00\t\\x07\\x08\\x0D\\x7F\\x80\\x9F',
+      '\\x00\\x09\\x07\\x08\\x0D\\x7F\\x80\\x9F',
     )
+    expect(displayText('a\nb')).toBe('a\nb')
   })
 
   it('preserves renderer-owned ANSI while wrapping escaped text by display width', () => {

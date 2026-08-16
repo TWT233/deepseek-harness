@@ -1,6 +1,6 @@
 import { wrapTextWithAnsi } from '@mariozechner/pi-tui'
 
-const CONTROL_BYTE = /[\u0000-\u0008\u000B-\u001F\u007F-\u009F]/g
+const CONTROL_BYTE = /[\u0000-\u0009\u000B-\u001F\u007F-\u009F]/g
 
 /**
  * Replace terminal control bytes with visible hexadecimal escapes.

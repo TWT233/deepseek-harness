@@ -4,6 +4,7 @@ import {
   visibleWidth,
 } from '@mariozechner/pi-tui'
 import { sliceByColumn } from '@mariozechner/pi-tui/dist/utils.js'
+import { displayText } from './display.ts'
 import type { RollingTerminalInput } from './types.ts'
 
 const segmenter = new Intl.Segmenter(undefined, { granularity: 'grapheme' })
@@ -13,9 +14,14 @@ const HISTORY_LIMIT = 100
 
 interface VisualLine {
   readonly text: string
-  readonly start: number
-  readonly end: number
   readonly width: number
+  readonly cursorPositions: readonly CursorPosition[]
+}
+
+interface CursorPosition {
+  readonly offset: number
+  readonly column: number
+  readonly canonical: boolean
 }
 
 /** Rendered editor rows and the cursor position relative to those rows. */
@@ -49,17 +55,22 @@ function lineBounds(text: string, cursor: number): { start: number; end: number 
 }
 
 function offsetAtColumn(line: VisualLine, column: number): number {
-  let offset = line.end
-  let width = 0
-  for (const segment of segmenter.segment(line.text)) {
-    const nextWidth = width + visibleWidth(segment.segment)
-    if (nextWidth > column) {
-      offset = line.start + segment.index
-      break
-    }
-    width = nextWidth
+  let offset = (line.cursorPositions[0] as CursorPosition).offset
+  for (const position of line.cursorPositions) {
+    if (position.column > column) break
+    offset = position.offset
   }
   return offset
+}
+
+function pushCursorPosition(
+  positions: CursorPosition[],
+  offset: number,
+  column: number,
+): void {
+  const previous = positions.at(-1)
+  if (previous?.offset === offset && previous.column === column) return
+  positions.push({ offset, column, canonical: true })
 }
 
 /**
@@ -152,14 +163,16 @@ export class RollingTerminalEditor {
     const visualLines = this.layout()
     const cursorRow = this.findCursorLine(visualLines)
     const cursorLine = visualLines[cursorRow] as VisualLine
-    const contentBeforeCursor = this.value.slice(cursorLine.start, this.cursor)
+    const cursorPosition = cursorLine.cursorPositions.find(
+      position => position.offset === this.cursor,
+    ) as CursorPosition
     const prompt = this.inputEnabled && cursorRow === 0 ? '> ' : '  '
     return {
       lines: visualLines.map((line, index) => (
         `${this.inputEnabled && index === 0 ? '> ' : '  '}${line.text}`
       )),
       cursorRow,
-      cursorColumn: visibleWidth(prompt) + visibleWidth(contentBeforeCursor),
+      cursorColumn: visibleWidth(prompt) + cursorPosition.column,
     }
   }
 
@@ -176,13 +189,9 @@ export class RollingTerminalEditor {
     const pasted = this.pasteBuffer.slice(0, end)
     const remaining = this.pasteBuffer.slice(end + PASTE_END.length)
     this.pasteBuffer = undefined
-    this.insert(this.normalizePaste(pasted))
+    this.insert(pasted)
     if (remaining) this.handleInput(remaining)
     return true
-  }
-
-  private normalizePaste(text: string): string {
-    return text.replace(/\r\n?|\n/g, '\n').replace(/\t/g, '    ')
   }
 
   private isPrintable(data: string): boolean {
@@ -236,7 +245,10 @@ export class RollingTerminalEditor {
       return
     }
     const current = visualLines[currentIndex] as VisualLine
-    const currentColumn = visibleWidth(this.value.slice(current.start, this.cursor))
+    const currentPosition = current.cursorPositions.find(
+      position => position.offset === this.cursor,
+    ) as CursorPosition
+    const currentColumn = currentPosition.column
     this.preferredColumn ??= currentColumn
     this.cursor = offsetAtColumn(
       visualLines[targetIndex] as VisualLine,
@@ -307,44 +319,74 @@ export class RollingTerminalEditor {
     for (const logicalLine of this.value.split('\n')) {
       const segments = [...segmenter.segment(logicalLine)]
       if (segments.length === 0) {
-        lines.push({ text: '', start: logicalStart, end: logicalStart, width: 0 })
-      } else {
-        let chunkStart = 0
-        let chunkStartColumn = 0
-        let chunkWidth = 0
-        for (const segment of segments) {
-          const width = visibleWidth(segment.segment)
-          if (chunkWidth > 0 && chunkWidth + width > contentWidth) {
-            const text = sliceByColumn(
-              logicalLine,
-              chunkStartColumn,
-              chunkWidth,
-              true,
-            )
-            lines.push({
-              text,
-              start: logicalStart + chunkStart,
-              end: logicalStart + segment.index,
-              width: chunkWidth,
-            })
-            chunkStart = segment.index
-            chunkStartColumn += chunkWidth
-            chunkWidth = 0
-          }
-          chunkWidth += width
-        }
-        const text = sliceByColumn(
-          logicalLine,
-          chunkStartColumn,
-          Math.max(chunkWidth, contentWidth),
-          true,
-        )
         lines.push({
-          text,
-          start: logicalStart + chunkStart,
-          end: logicalStart + logicalLine.length,
-          width: chunkWidth,
+          text: '',
+          width: 0,
+          cursorPositions: [{
+            offset: logicalStart,
+            column: 0,
+            canonical: true,
+          }],
         })
+      } else {
+        let chunkText = ''
+        let chunkWidth = 0
+        let cursorPositions: CursorPosition[] = []
+        const pushChunk = (): void => {
+          lines.push({
+            text: chunkText,
+            width: chunkWidth,
+            cursorPositions,
+          })
+          chunkText = ''
+          chunkWidth = 0
+          cursorPositions = []
+        }
+        for (const segment of segments) {
+          const rendered = displayText(segment.segment)
+          const width = visibleWidth(rendered)
+          const segmentStart = logicalStart + segment.index
+          const segmentEnd = segmentStart + segment.segment.length
+          if (chunkWidth > 0 && chunkWidth + width > contentWidth) {
+            pushChunk()
+          }
+          if (width > contentWidth && rendered.length > 1) {
+            let renderedColumn = 0
+            while (renderedColumn < width) {
+              const text = sliceByColumn(
+                rendered,
+                renderedColumn,
+                contentWidth,
+                true,
+              )
+              const partWidth = visibleWidth(text)
+              const partPositions: CursorPosition[] = [{
+                offset: segmentStart,
+                column: 0,
+                canonical: renderedColumn === 0,
+              }]
+              if (renderedColumn + partWidth === width) {
+                partPositions.push({
+                  offset: segmentEnd,
+                  column: partWidth,
+                  canonical: true,
+                })
+              }
+              lines.push({
+                text,
+                width: partWidth,
+                cursorPositions: partPositions,
+              })
+              renderedColumn += partWidth
+            }
+            continue
+          }
+          pushCursorPosition(cursorPositions, segmentStart, chunkWidth)
+          chunkText += rendered
+          chunkWidth += width
+          pushCursorPosition(cursorPositions, segmentEnd, chunkWidth)
+        }
+        if (chunkText || cursorPositions.length > 0) pushChunk()
       }
       logicalStart += logicalLine.length + 1
     }
@@ -352,14 +394,10 @@ export class RollingTerminalEditor {
   }
 
   private findCursorLine(lines: readonly VisualLine[]): number {
-    return lines.findIndex((line, index) => (
-      this.cursor >= line.start
-      && this.cursor <= line.end
-      && (
-        this.cursor > line.start
-        || index === 0
-        || lines[index - 1]?.end !== this.cursor
-      )
+    return lines.findIndex(line => (
+      line.cursorPositions.some(position => (
+        position.canonical && position.offset === this.cursor
+      ))
     ))
   }
 }

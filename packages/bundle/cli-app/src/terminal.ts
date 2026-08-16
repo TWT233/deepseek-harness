@@ -1,5 +1,5 @@
 import { ProcessTerminal } from '@mariozechner/pi-tui'
-import { displayText, wrapDisplayLines } from './display.ts'
+import { wrapDisplayLines } from './display.ts'
 import { RollingTerminalEditor } from './editor.ts'
 import type {
   RollingTerminalInput,
@@ -78,6 +78,11 @@ interface ActiveItem extends RollingTerminalItem {
 
 /**
  * Create a bounded rolling terminal over one terminal device.
+ *
+ * Item, question, and status lines are renderer-prepared text: producers
+ * escape untrusted content with `displayText()` before adding trusted ANSI.
+ * The editor owns equivalent sanitization for its raw draft.
+ *
  * @param device - Terminal lifecycle and output operations.
  * @param options - Initial editor behavior.
  * @returns Terminal port consumed by the CLI runner and transcript projector.
@@ -88,6 +93,7 @@ export function createRollingTerminal(
 ): RollingTerminalPort {
   const active = new Map<string, ActiveItem>()
   let activeHeight = 0
+  let activeCursorRow = 0
   let committedCount = 0
   let question: readonly string[] | undefined
   let status: string | undefined
@@ -104,7 +110,7 @@ export function createRollingTerminal(
   function clearActiveRegion(): void {
     if (activeHeight === 0) return
     let sequence = '\r'
-    if (activeHeight > 1) sequence += `\x1b[${activeHeight - 1}A`
+    if (activeCursorRow > 0) sequence += `\x1b[${activeCursorRow}A`
     for (let index = 0; index < activeHeight; index += 1) {
       sequence += '\x1b[2K'
       if (index < activeHeight - 1) sequence += '\x1b[1B\r'
@@ -113,10 +119,11 @@ export function createRollingTerminal(
     sequence += '\r'
     device.write(sequence)
     activeHeight = 0
+    activeCursorRow = 0
   }
 
   function displayLines(lines: readonly string[]): string[] {
-    return lines.flatMap(line => wrapDisplayLines(displayText(line), device.columns))
+    return lines.flatMap(line => wrapDisplayLines(line, device.columns))
   }
 
   function commitSettledPrefix(): void {
@@ -130,21 +137,69 @@ export function createRollingTerminal(
     }
   }
 
-  function activeLines(): string[] {
+  function activeRender(): {
+    readonly lines: readonly string[]
+    readonly cursorRow: number
+    readonly cursorColumn: number
+  } {
     const lines = orderedItems().flatMap(item => displayLines(item.lines))
     if (question) lines.push(...displayLines(question))
     if (status !== undefined) lines.push(...displayLines([status]))
-    lines.push(...editor.render(device.columns).lines.map(displayText))
-    return lines
+    const renderedEditor = editor.render(device.columns)
+    const editorStart = lines.length
+    lines.push(...renderedEditor.lines)
+    return {
+      lines,
+      cursorRow: editorStart + renderedEditor.cursorRow,
+      cursorColumn: renderedEditor.cursorColumn,
+    }
+  }
+
+  function visibleRender(): {
+    readonly lines: readonly string[]
+    readonly cursorRow: number
+    readonly cursorColumn: number
+  } {
+    const rendered = activeRender()
+    const height = Math.max(1, Math.floor(device.rows))
+    const maxStart = Math.max(0, rendered.lines.length - height)
+    const start = Math.max(
+      0,
+      Math.min(rendered.cursorRow - height + 1, maxStart),
+    )
+    return {
+      lines: rendered.lines.slice(start, start + height),
+      cursorRow: rendered.cursorRow - start,
+      cursorColumn: rendered.cursorColumn,
+    }
+  }
+
+  function positionCursor(
+    height: number,
+    cursorRow: number,
+    cursorColumn: number,
+  ): void {
+    let sequence = '\r'
+    const rowsUp = height - cursorRow - 1
+    if (rowsUp > 0) sequence += `\x1b[${rowsUp}A`
+    sequence += `\x1b[${cursorColumn}C`
+    device.write(`${sequence}${SHOW_CURSOR}`)
   }
 
   function redraw(): void {
     if (!started) return
+    device.write(HIDE_CURSOR)
     clearActiveRegion()
     commitSettledPrefix()
-    const lines = activeLines()
-    device.write(lines.join('\r\n'))
-    activeHeight = lines.length
+    const rendered = visibleRender()
+    device.write(rendered.lines.join('\r\n'))
+    activeHeight = rendered.lines.length
+    activeCursorRow = rendered.cursorRow
+    positionCursor(
+      activeHeight,
+      rendered.cursorRow,
+      rendered.cursorColumn,
+    )
   }
 
   return {
@@ -156,7 +211,6 @@ export function createRollingTerminal(
         editor.handleInput(data)
         redraw()
       }, redraw)
-      device.write(HIDE_CURSOR)
       redraw()
     },
 
@@ -195,6 +249,7 @@ export function createRollingTerminal(
       status = undefined
       editor.clear()
       activeHeight = 0
+      activeCursorRow = 0
       committedCount = 0
       if (!started) return
       device.write(CLEAR_SCREEN)
@@ -205,6 +260,7 @@ export function createRollingTerminal(
       if (stopping) return stopping
       stopping = (async () => {
         if (!started) return
+        device.write(HIDE_CURSOR)
         clearActiveRegion()
         device.write(SHOW_CURSOR)
         try {

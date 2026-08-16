@@ -128,7 +128,17 @@ describe('rolling terminal editor', () => {
     editor.handleInput('\x1b[200~hello\r')
     editor.handleInput('\n\tworld\x1b[201~!')
 
-    expect(editor.text).toBe('hello\n    world!')
+    expect(editor.text).toBe('hello\r\n\tworld!')
+    expect(editor.render(10)).toMatchObject({
+      lines: [
+        '> hello',
+        '  \\x0D',
+        '  \\x09wor',
+        '  ld!',
+      ],
+      cursorRow: 3,
+      cursorColumn: 5,
+    })
   })
 
   it('accepts a complete bracketed paste without trailing input', () => {
@@ -137,6 +147,40 @@ describe('rolling terminal editor', () => {
     editor.handleInput('\x1b[200~pasted\x1b[201~')
 
     expect(editor.text).toBe('pasted')
+  })
+
+  it('sanitizes pasted controls before wrapping and cursor layout', () => {
+    const { editor } = setup()
+
+    editor.handleInput('\x1b[200~a\tb\x1b[31m\x1b[201~')
+
+    expect(editor.text).toBe('a\tb\x1b[31m')
+    expect(editor.render(8)).toEqual({
+      lines: [
+        '> a\\x09',
+        '  b\\x1B',
+        '  [31m',
+      ],
+      cursorRow: 2,
+      cursorColumn: 6,
+    })
+  })
+
+  it('wraps one escaped control atom across a one-column content area', () => {
+    const { editor } = setup()
+
+    editor.handleInput('\x1b[200~a\t\x1b[201~')
+
+    expect(editor.render(4)).toEqual({
+      lines: ['> a', '  \\', '  x', '  0', '  9'],
+      cursorRow: 4,
+      cursorColumn: 3,
+    })
+    editor.handleInput('\x1b[A')
+    expect(editor.render(4)).toMatchObject({
+      cursorRow: 0,
+      cursorColumn: 3,
+    })
   })
 
   it('navigates submitted history and returns to the current draft', () => {
