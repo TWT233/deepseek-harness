@@ -356,6 +356,9 @@ describe('interactive CLI runner', () => {
     ])
     expect(test.terminal.items.some(item => item.lines.some(line =>
       line.includes('danger-full-access')))).toBe(true)
+    expect(test.terminal.items.some(item => item.lines.includes(
+      `Session ID: ${String(test.agent?.session.id)}`,
+    ))).toBe(true)
 
     test.terminal.send({ kind: 'eof' })
     await running

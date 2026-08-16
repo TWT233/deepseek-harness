@@ -18,7 +18,7 @@ startup 入口通过启动器持有的 [`dsh-cmdline`](../../boot/cmdline/README
 
 `appendCliSessionMarker()` 依次写入 `sandbox/mode`、`approval/policy` 和必需的 `cli/session` marker（标记）。`readCliSessionMarker()` 要求恰好一个受支持 marker，并校验其 sandbox mode（沙箱模式）和 approval policy（审批策略）与之前的策略事件一致。包 invariant（不变量）仅在 marker 已存在后，对已加载日志与新的 `session/event` candidate（候选事件）应用同一关系，因此 Web 和 Headless Session，以及新 CLI 写入 marker 前的策略事件仍然有效。恢复还要求记录的 workspace（工作区），并选择最新记录的请求模型；只有空白 Session 才回退到部署默认模型。
 
-随附 patch 设置 `danger-full-access` 和 `never` 审批策略，禁用权限选择器，并且不挂载审批 UI。终端警告属于用户可见行为。Loader 或 provider 配置会在获取终端前失败；获取终端后，插件 dispose（资源释放）会先排空 Agent 和 Session，再恢复终端。
+随附 patch 设置 `danger-full-access` 和 `never` 审批策略，禁用权限选择器，并且不挂载审批 UI。启动块会显示精确 Session ID 以供之后显式恢复，并显示完整访问警告。Loader 或 provider 配置会在获取终端前失败；获取终端后，插件 dispose（资源释放）会先排空 Agent 和 Session，再恢复终端。
 
 ## 模型体验
 

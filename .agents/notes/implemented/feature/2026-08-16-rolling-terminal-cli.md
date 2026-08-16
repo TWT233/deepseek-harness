@@ -18,7 +18,7 @@ Bare `dsh` selects the shipped `cli` profile, whose ordered bundles are `@deepse
 
 Bare `dsh --resume <id>` selects the same profile and forwards `--resume` to its startup plugin. Standalone bare help and version remain launcher-owned; help after the application-argument boundary is forwarded to the selected application. Launcher flags must precede application arguments, so `--patch` precedes `--resume`.
 
-The shipped CLI profile uses sandbox mode `danger-full-access`, approval policy `never`, and no permission-selector or approval UI. Tool execution still consumes the approval service, whose deterministic `never` policy requires no answerer. A stable warning tells the user that commands and tools can modify any path available to the process. Model-requested user questions remain interactive through `ctx.userQuestions`.
+The shipped CLI profile uses sandbox mode `danger-full-access`, approval policy `never`, and no permission-selector or approval UI. Tool execution still consumes the approval service, whose deterministic `never` policy requires no answerer. The settled startup block prints the exact Session ID for later explicit resume and warns that commands and tools can modify any path available to the process. Model-requested user questions remain interactive through `ctx.userQuestions`.
 
 ## Package and profile
 

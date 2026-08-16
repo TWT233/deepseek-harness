@@ -193,8 +193,7 @@ describe('rolling CLI keyless PTY lifecycle', () => {
   it('resumes the first process Session in the same cwd and replays its transcript', async () => {
     const cwd = await mkdtemp(join(tmpdir(), 'dsh-cli-resume-'))
     try {
-      let sessionId = ''
-      await smoke({
+      const first = await smoke({
         label: 'CLI resume first process',
         cwd,
         actions: [
@@ -207,10 +206,13 @@ describe('rolling CLI keyless PTY lifecycle', () => {
             send: '/exit\r',
           },
         ],
-        inspect: async () => {
-          sessionId = (await onlySession(join(cwd, '.sessions'))).id
-        },
       })
+      const sessionId = /Session ID: (?<id>session-[0-9a-f-]+)/iu.exec(first)
+        ?.groups?.id
+      expect(sessionId).toBeDefined()
+      if (sessionId === undefined) {
+        throw new Error('fresh CLI output did not expose its Session ID')
+      }
       const resumed = await smoke({
         label: 'CLI resume second process',
         cwd,

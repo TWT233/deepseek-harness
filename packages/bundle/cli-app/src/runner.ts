@@ -95,12 +95,19 @@ function installSelection(
   }
 }
 
-function warningItem(terminal: RollingTerminalPort, order: number): void {
+function startupItem(
+  terminal: RollingTerminalPort,
+  sessionId: SessionId,
+  order: number,
+): void {
   terminal.upsert({
-    id: 'cli:full-access-warning',
+    id: 'cli:startup',
     order,
     settled: true,
-    lines: [displayText(FULL_ACCESS_WARNING)],
+    lines: [
+      displayText(`Session ID: ${sessionId}`),
+      displayText(FULL_ACCESS_WARNING),
+    ],
   })
 }
 
@@ -261,7 +268,7 @@ export async function runCli(
       })
     }
     projector.replay(agent.session.events)
-    warningItem(terminal, agent.session.seq)
+    startupItem(terminal, agent.session.id, agent.session.seq)
     terminal.start(inputHandler(
       ctx,
       agent,

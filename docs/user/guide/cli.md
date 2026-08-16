@@ -12,7 +12,7 @@ Change to the project the Agent may inspect and modify, then run:
 npx @deepseek-ai/dsh
 ```
 
-The CLI uses that directory as the Session workspace and prints a warning before the editor opens. The shipped `cli` profile runs with `danger-full-access` and approval policy `never`: commands and tools can modify any path available to the `dsh` process, and the CLI provides no approval prompt. Start it only in an environment where that access is acceptable.
+The CLI uses that directory as the Session workspace and prints the Session ID and a warning before the editor opens. The shipped `cli` profile runs with `danger-full-access` and approval policy `never`: commands and tools can modify any path available to the `dsh` process, and the CLI provides no approval prompt. Start it only in an environment where that access is acceptable.
 
 Model-requested questions remain interactive. The lack of an approval UI does not suppress questions the Agent asks to complete the task.
 
@@ -42,7 +42,7 @@ Ctrl+C cancels active Agent work and leaves the CLI open. Press Ctrl+C while idl
 
 ## Resume a Session
 
-Keep the Session ID from the CLI Session data or the surrounding product workflow, return to the same workspace, and run:
+Copy the Session ID printed above the editor, return to the same workspace, and run:
 
 ```sh
 dsh --resume <session-id>

@@ -12,7 +12,7 @@
 npx @deepseek-ai/dsh
 ```
 
-CLI 会把该目录作为 Session workspace（工作区），并在打开编辑器前显示警告。随附的 `cli` profile 采用 `danger-full-access` 和 `never` 审批策略：命令和工具可以修改 `dsh` 进程能够访问的任何路径，CLI 不提供审批提示。请仅在能够接受这种访问权限的环境中启动。
+CLI 会把该目录作为 Session workspace（工作区），并在打开编辑器前显示 Session ID 和警告。随附的 `cli` profile 采用 `danger-full-access` 和 `never` 审批策略：命令和工具可以修改 `dsh` 进程能够访问的任何路径，CLI 不提供审批提示。请仅在能够接受这种访问权限的环境中启动。
 
 模型请求的问题仍可交互回答。没有审批 UI 不会屏蔽 Agent 为完成任务而提出的问题。
 
@@ -42,7 +42,7 @@ Ctrl+C 会取消进行中的 Agent 工作并保持 CLI 打开。在 Agent 空闲
 
 ## 恢复 Session
 
-从 CLI Session 数据或周边产品流程中保留 Session ID，回到同一个工作区，然后运行：
+复制编辑器上方显示的 Session ID，回到同一个工作区，然后运行：
 
 ```sh
 dsh --resume <session-id>

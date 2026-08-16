@@ -41,7 +41,7 @@ dsh --profile web --patch ./extra.yml --dump-config
 
 ## Interactive terminal
 
-Bare `dsh` starts a fresh CLI Session in the invoking directory. `dsh --resume <session-id>` is the only automatic resume form: the runner inspects persistence before acquiring the terminal, requires exactly one supported `cli/session` marker consistent with the preceding `sandbox/mode` and `approval/policy` events, and requires the current directory to match `SessionHeader.cwd`. A resumed Session selects the model from its latest `request/header`; if the Session has no request header, it uses the deployment's current default model.
+Bare `dsh` starts a fresh CLI Session in the invoking directory and prints its exact Session ID before the editor. `dsh --resume <session-id>` is the only automatic resume form: the runner inspects persistence before acquiring the terminal, requires exactly one supported `cli/session` marker consistent with the preceding `sandbox/mode` and `approval/policy` events, and requires the current directory to match `SessionHeader.cwd`. A resumed Session selects the model from its latest `request/header`; if the Session has no request header, it uses the deployment's current default model.
 
 The shipped `cli` bundle sets sandbox mode `danger-full-access`, approval policy `never`, and disables the permission-selector service. The approval service remains mounted for tool execution, but no approval answerer or approval UI is registered. A user-visible warning states that commands and tools can modify any path available to the process. The `ctx.userQuestions` provider remains interactive for model-requested structured questions.
 

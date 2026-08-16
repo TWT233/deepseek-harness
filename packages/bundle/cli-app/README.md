@@ -18,7 +18,7 @@ The rolling renderer commits settled lines to ordinary scrollback and redraws on
 
 `appendCliSessionMarker()` writes `sandbox/mode`, `approval/policy`, then the required `cli/session` marker. `readCliSessionMarker()` requires exactly one supported marker and verifies that its sandbox mode and approval policy match the preceding policy events. The package invariant applies the same relation to loaded logs and new `session/event` candidates only after a marker exists, so Web and Headless Sessions plus a fresh CLI's policy events before its marker remain valid. Resume also requires the recorded workspace and selects the latest logged request model, falling back to the deployment default only for a blank Session.
 
-The shipped patch sets `danger-full-access` and approval policy `never`, disables the permission selector, and mounts no approval UI. The terminal warning is part of the user-visible behavior. Loader or provider configuration fails before terminal acquisition; after acquisition, plugin disposal drains the Agent and Session before restoring the terminal.
+The shipped patch sets `danger-full-access` and approval policy `never`, disables the permission selector, and mounts no approval UI. The startup block prints the exact Session ID for later explicit resume and the full-access warning. Loader or provider configuration fails before terminal acquisition; after acquisition, plugin disposal drains the Agent and Session before restoring the terminal.
 
 ## Model Experience
 
