@@ -11,7 +11,11 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
-import { runCliPtySmoke, type CliPtySmokeOptions } from './pty-harness.ts'
+import {
+  resolveCliPtySignalDelivery,
+  runCliPtySmoke,
+  type CliPtySmokeOptions,
+} from './pty-harness.ts'
 
 const dshBinScript = fileURLToPath(new URL('../src/bin.ts', import.meta.url))
 const scriptedConfigPath = fileURLToPath(
@@ -299,13 +303,37 @@ describe('rolling CLI keyless PTY lifecycle', () => {
   })
 
   it('exits zero through bounded tree disposal on SIGTERM', async () => {
+    const signalAction = {
+      waitFor: 'Active turn is waiting for SIGTERM.',
+      signal: 'SIGTERM',
+      windowsBridge: {
+        path: join('.dsh', 'sigterm'),
+        content: 'emit\n',
+      },
+    } as const
+    expect(resolveCliPtySignalDelivery('win32', String.raw`C:\work`, signalAction))
+      .toEqual({
+        kind: 'marker',
+        path: join(String.raw`C:\work`, '.dsh', 'sigterm'),
+        content: 'emit\n',
+      })
+    expect(resolveCliPtySignalDelivery('linux', '/work', signalAction))
+      .toEqual({ kind: 'process', signal: 'SIGTERM' })
+
     const output = await smoke({
       label: 'CLI SIGTERM disposal',
+      env: {
+        DSH_CLI_SIGTERM_BRIDGE: join('.dsh', 'sigterm'),
+        DSH_CLI_PTY_DRAIN_PROBE: '1',
+      },
       actions: [
         { waitFor: 'danger-full-access is active', send: 'Hold for SIGTERM.\r' },
-        { waitFor: 'Active turn is waiting for SIGTERM.', signal: 'SIGTERM' },
+        signalAction,
       ],
     })
     expectTerminalRestored(output)
+    if (process.platform !== 'win32') {
+      expect(output).toContain('PTY_DRAINED_TAIL')
+    }
   })
 })

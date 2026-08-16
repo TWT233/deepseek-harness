@@ -1,5 +1,6 @@
-import { access } from 'node:fs/promises'
+import { access, readFile } from 'node:fs/promises'
 import { join } from 'node:path'
+import { spawn } from 'node:child_process'
 import type { Context } from '@deepseek-ai/cordis'
 import {
   CallId,
@@ -105,6 +106,44 @@ async function waitForSteeringRelease(signal?: AbortSignal): Promise<void> {
     await new Promise<void>(resolve => setTimeout(resolve, 10))
   }
   throw new Error(`scripted CLI steering release did not appear at ${path}`)
+}
+
+function installWindowsSigtermBridge(): void {
+  if (process.platform !== 'win32') return
+  const bridge = process.env.DSH_CLI_SIGTERM_BRIDGE
+  if (bridge === undefined) return
+  let emitted = false
+  const timer = setInterval(() => {
+    if (emitted) return
+    void readFile(bridge, 'utf8').then(() => {
+      emitted = true
+      process.emit('SIGTERM')
+    }, (error: unknown) => {
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error
+    })
+  }, 20)
+  timer.unref()
+}
+
+function installPosixDrainProbe(): void {
+  if (process.platform === 'win32'
+    || process.env.DSH_CLI_PTY_DRAIN_PROBE !== '1') return
+  const script = [
+    'const parent = Number(process.argv[1])',
+    "process.on('SIGHUP', () => {})",
+    'const timer = setInterval(() => {',
+    '  try { process.kill(parent, 0) }',
+    '  catch {',
+    '    clearInterval(timer)',
+    "    setTimeout(() => process.stdout.write('PTY_DRAINED_TAIL\\n'), 20)",
+    '  }',
+    '}, 5)',
+  ].join('\n')
+  const probe = spawn(process.execPath, ['-e', script, String(process.pid)], {
+    detached: true,
+    stdio: ['ignore', 'inherit', 'inherit'],
+  })
+  probe.unref()
 }
 
 /** Network-free adapter for the shipped CLI product acceptance journeys. */
@@ -281,5 +320,7 @@ export const inject = ['llm']
 
 /** Register the scripted adapter used by real-PTY CLI acceptance. */
 export function apply(ctx: Context): void {
+  installWindowsSigtermBridge()
+  installPosixDrainProbe()
   ctx.llm.registerAdapter([PROVIDER], new ScriptedCliAdapter())
 }

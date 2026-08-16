@@ -26,15 +26,26 @@ output = bytearray()
 action_index = 0
 deadline = time.monotonic() + float(timeout_seconds)
 status = None
+
+def read_pty():
+    try:
+        return os.read(fd, 65536)
+    except OSError as error:
+        if error.errno != errno.EIO:
+            raise
+        return b""
+
+def drain_pty():
+    while True:
+        chunk = read_pty()
+        if not chunk:
+            return
+        output.extend(chunk)
+
 while time.monotonic() < deadline:
     ready, _, _ = select.select([fd], [], [], 0.05)
     if ready:
-        try:
-            chunk = os.read(fd, 65536)
-        except OSError as error:
-            if error.errno != errno.EIO:
-                raise
-            chunk = b""
+        chunk = read_pty()
         if chunk:
             output.extend(chunk)
     while action_index < len(actions):
@@ -62,6 +73,7 @@ while time.monotonic() < deadline:
 if status is None:
     os.kill(pid, signal.SIGKILL)
     _, status = os.waitpid(pid, 0)
+drain_pty()
 sys.stdout.buffer.write(output)
 if action_index != len(actions):
     sys.stderr.buffer.write(
@@ -89,6 +101,10 @@ export type CliPtyAction =
     readonly waitFor: string
     readonly occurrence?: number
     readonly signal: 'SIGTERM'
+    readonly windowsBridge: {
+      readonly path: string
+      readonly content: string
+    }
   }
   | {
     readonly waitFor: string
@@ -99,6 +115,30 @@ export type CliPtyAction =
     }
     readonly send?: string
   }
+
+/** How one signal action reaches the child on the selected platform. */
+export type CliPtySignalDelivery =
+  | { readonly kind: 'process'; readonly signal: 'SIGTERM' }
+  | {
+    readonly kind: 'marker'
+    readonly path: string
+    readonly content: string
+  }
+
+/** Resolve one signal action without invoking platform-specific process APIs. */
+export function resolveCliPtySignalDelivery(
+  platform: NodeJS.Platform,
+  cwd: string,
+  action: Extract<CliPtyAction, { signal: 'SIGTERM' }>,
+): CliPtySignalDelivery {
+  return platform === 'win32'
+    ? {
+      kind: 'marker',
+      path: join(cwd, action.windowsBridge.path),
+      content: action.windowsBridge.content,
+    }
+    : { kind: 'process', signal: action.signal }
+}
 
 /** Inputs for a keyless real-Loader CLI process smoke. */
 export interface CliPtySmokeOptions {
@@ -206,7 +246,17 @@ async function runWindowsPtySmoke(
       ) {
         const action = actions[actionIndex]!
         if ('signal' in action) {
-          terminal.kill(action.signal)
+          const delivery = resolveCliPtySignalDelivery(
+            process.platform,
+            cwd,
+            action,
+          )
+          if (delivery.kind === 'process') {
+            terminal.kill(delivery.signal)
+          } else {
+            mkdirSync(dirname(delivery.path), { recursive: true })
+            writeFileSync(delivery.path, delivery.content)
+          }
         } else if ('writeFile' in action) {
           const target = join(cwd, action.writeFile.path)
           mkdirSync(dirname(target), { recursive: true })
