@@ -350,7 +350,7 @@ export class RollingTerminalEditor {
           if (chunkWidth > 0 && chunkWidth + width > contentWidth) {
             pushChunk()
           }
-          if (width > contentWidth && rendered.length > 1) {
+          if (width > contentWidth && rendered !== segment.segment) {
             let renderedColumn = 0
             while (renderedColumn < width) {
               const text = sliceByColumn(

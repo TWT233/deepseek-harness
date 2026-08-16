@@ -1,3 +1,5 @@
+import { spawnSync } from 'node:child_process'
+import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 import type { RollingTerminalInput } from '../src/types.ts'
 import { RollingTerminalEditor } from '../src/editor.ts'
@@ -180,6 +182,38 @@ describe('rolling terminal editor', () => {
     expect(editor.render(4)).toMatchObject({
       cursorRow: 0,
       cursorColumn: 3,
+    })
+  })
+
+  it('renders a wide grapheme in a one-column content area without hanging', () => {
+    const editorUrl = new URL('../src/editor.ts', import.meta.url).href
+    const result = spawnSync(
+      process.execPath,
+      [
+        '--import',
+        'tsx/esm',
+        '--input-type=module',
+        '--eval',
+        [
+          `import { RollingTerminalEditor } from ${JSON.stringify(editorUrl)}`,
+          'const editor = new RollingTerminalEditor(() => {})',
+          'editor.handleInput("👍")',
+          'process.stdout.write(JSON.stringify(editor.render(4)))',
+        ].join(';'),
+      ],
+      {
+        cwd: fileURLToPath(new URL('../../../../', import.meta.url)),
+        encoding: 'utf8',
+        timeout: 1_000,
+      },
+    )
+
+    expect(result.error).toBeUndefined()
+    expect(result.status).toBe(0)
+    expect(JSON.parse(result.stdout)).toEqual({
+      lines: ['> 👍'],
+      cursorRow: 0,
+      cursorColumn: 4,
     })
   })
 
