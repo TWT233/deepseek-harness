@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/superpowers/plans/2026-08-16-rolling-terminal-cli.md
-2026-08-16-rolling-terminal-cli.md: 5a582094e18deaf227631ec09ffa038d55262d60
-2026-08-16-rolling-terminal-cli.zh.md: b8d415ed8000dcb3bf538d38ebedceeaf17ca8c1
+2026-08-16-rolling-terminal-cli.md: 3ffb7615b13df4dc18215d1002d03df7c49f4886
+2026-08-16-rolling-terminal-cli.zh.md: a383975ccf68459941a1e367ae2253e835937232

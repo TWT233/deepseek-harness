@@ -12,7 +12,7 @@ English | [中文](2026-08-16-rolling-terminal-cli.zh.md)
 
 ## Global Constraints
 
-- Work only in `/data00/home/wangqiyilang/playground/.worktree/interactive-cli/deepseek-harness` on integration branch `feat/interactive-cli`; root checkout stays a clean `master` mirror.
+- Keep `/data00/home/wangqiyilang/playground/.worktree/interactive-cli/deepseek-harness` on integration branch `feat/interactive-cli` as the sole aggregation, integration-verification, and delivery source. Implement each task on its own branch in a sibling task worktree under `/data00/home/wangqiyilang/playground/.worktree/interactive-cli/`; the root checkout stays a clean `master` mirror.
 - Every task below is one independently reviewed commit; run its focused checks, commit with `Co-authored-by: TRAE CLI <noreply@bytedance.com>` exactly once, and push to `fork/feat/interactive-cli` before starting the next task.
 - The application is a Cordis plugin bundle. `apps/cli` may select `cli` before plugins load, but it must not own Agent, Session, rendering, commands, questions, or terminal behavior.
 - Do not modify `packages/core/agent-loop`; consume `ctx.agents`, `Agent.followup`, `Agent.steer`, `Agent.cancel`, and `Agent.whenIdle`.

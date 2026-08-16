@@ -12,7 +12,7 @@
 
 ## 全局约束
 
-- 只在 `/data00/home/wangqiyilang/playground/.worktree/interactive-cli/deepseek-harness` 的 integration branch `feat/interactive-cli` 中工作；根 checkout 保持干净的 `master` 镜像。
+- 让 `/data00/home/wangqiyilang/playground/.worktree/interactive-cli/deepseek-harness` 的 integration branch `feat/interactive-cli` 成为唯一汇总、集成验证与交付来源。每个任务都在 `/data00/home/wangqiyilang/playground/.worktree/interactive-cli/` 下的 sibling task worktree 中使用自己的 branch 实现；根 checkout 保持干净的 `master` 镜像。
 - 下方每个任务都是一个可独立 review 的 commit；运行其 focused check，使用且仅使用一次 `Co-authored-by: TRAE CLI <noreply@bytedance.com>`，提交并推送到 `fork/feat/interactive-cli` 后，才能开始下一任务。
 - 应用必须是 Cordis plugin bundle。`apps/cli` 可以在插件加载前选择 `cli`，但不得拥有 Agent、Session、rendering、command、question 或 terminal behavior。
 - 不修改 `packages/core/agent-loop`；使用 `ctx.agents`、`Agent.followup`、`Agent.steer`、`Agent.cancel` 和 `Agent.whenIdle`。
