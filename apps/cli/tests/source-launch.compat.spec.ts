@@ -6,8 +6,9 @@ import { describe, expect, it } from 'vitest'
 /**
  * Keyless smoke for SOURCE `dsh` execution: run `apps/cli/src/bin.ts`
  * with the exact production runtime vector (`node --import tsx/esm`, the
- * vector the root `dsh` script invokes directly) and assert the
- * required-config diagnostic. The Node compatibility matrix runs this
+ * vector the root `dsh` script invokes directly) and assert that bare `dsh`
+ * reaches the default CLI profile before refusing piped stdio. The Node
+ * compatibility matrix runs this
  * WHOLE file, so a Node release changing module hooks or TypeScript handling
  * breaks this gate instead of every developer's `pnpm dsh`; the built-bin
  * suite covers the published `lib/` entry, not this source chain.
@@ -24,7 +25,7 @@ describe('dsh SOURCE launcher (node --import tsx/esm)', () => {
     expect(rootPackage.scripts?.dsh).toBe('node --import tsx/esm apps/cli/src/bin.ts')
   })
 
-  it('boots the source entry and requires a profile', async () => {
+  it('routes bare source launch to the CLI profile and refuses piped stdio', async () => {
     const result = await execa(process.execPath, ['--import', 'tsx/esm', dshSourceBin], {
       cwd: repoRoot,
       input: '',
@@ -36,7 +37,7 @@ describe('dsh SOURCE launcher (node --import tsx/esm)', () => {
       throw new Error(`dsh source launch did not exit within 25s. stdout:\n${result.stdout}\nstderr:\n${result.stderr}`)
     }
     expect(result.exitCode).not.toBe(0)
-    expect(result.stderr).toContain('--profile <name> is required')
+    expect(result.stderr).toContain('interactive CLI requires TTY stdin and stdout')
     expect(result.stdout).toBe('')
   }, 30_000)
 })
